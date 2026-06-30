@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.venv/
+data/
+reports/
+outputs/
+service_account.json
+client_secret.json
+*.key
+*.pem

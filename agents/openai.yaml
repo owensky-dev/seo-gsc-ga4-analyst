@@ -1,0 +1,6 @@
+interface:
+  display_name: "SEO GSC GA4 Analyst"
+  short_description: "Local GSC and GA4 SEO diagnosis reports"
+  default_prompt: "Use $seo-gsc-ga4-analyst to fetch GSC and GA4 data, diagnose SEO opportunities, and produce an execution report."
+policy:
+  allow_implicit_invocation: true
