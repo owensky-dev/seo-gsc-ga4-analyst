@@ -1,0 +1,4 @@
+google-analytics-data>=0.18.12
+google-auth>=2.33.0
+pandas>=2.2.2
+python-dotenv>=1.0.1

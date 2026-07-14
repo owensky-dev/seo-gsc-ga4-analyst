@@ -1,5 +1,7 @@
 # SEO GSC GA4 Analyst
 
+[![CI](https://github.com/owensky-dev/seo-gsc-ga4-analyst/actions/workflows/ci.yml/badge.svg)](https://github.com/owensky-dev/seo-gsc-ga4-analyst/actions/workflows/ci.yml)
+
 Codex skill for building a local SEO data analysis workflow with Google Search Console API and GA4 Data API.
 
 It helps Codex scaffold a Python project, fetch GSC and GA4 Organic Search data, merge both sources by landing page, diagnose SEO opportunities, and generate execution-focused SEO reports.
