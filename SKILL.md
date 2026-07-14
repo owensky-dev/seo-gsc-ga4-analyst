@@ -39,12 +39,15 @@ python3 -m venv .venv
 .venv/bin/python scripts/weekly_report.py
 ```
 
+The GA4 fetch must keep landing-page Sessions and ecommerce events in separate requests. Preserve `date` on the Organic landing-page rows, and fetch `add_to_cart` plus `begin_checkout` using `date`, `landingPagePlusQueryString`, and `eventName` with `eventCount`.
+
 4. When network access is restricted, retry API fetch commands with the appropriate approval path. Explain that GSC/GA4 calls require outbound network access.
 
 5. Validate outputs before reporting success:
 
 - `data/raw/gsc_90d.csv`
 - `data/raw/ga4_organic_landing_pages_90d.csv`
+- `data/raw/ga4_organic_funnel_90d.csv`
 - `data/processed/gsc_pages_90d.csv`
 - `data/processed/gsc_keywords_90d.csv`
 - `data/processed/seo_merged_pages_90d.csv`

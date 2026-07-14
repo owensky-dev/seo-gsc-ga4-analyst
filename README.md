@@ -8,6 +8,7 @@ It helps Codex scaffold a Python project, fetch GSC and GA4 Organic Search data,
 
 - Fetches 90-day Google Search Console search performance data.
 - Fetches 90-day GA4 Organic Search landing page data.
+- Fetches date-level Organic Search `add_to_cart` and `begin_checkout` events in a separate GA4 query.
 - Joins GSC pages and GA4 landing pages with normalized URLs.
 - Identifies high-impact SEO opportunities:
   - High impressions and low CTR
@@ -86,6 +87,7 @@ python3 -m venv .venv
 ```text
 data/raw/gsc_90d.csv
 data/raw/ga4_organic_landing_pages_90d.csv
+data/raw/ga4_organic_funnel_90d.csv
 data/processed/gsc_pages_90d.csv
 data/processed/gsc_keywords_90d.csv
 data/processed/seo_merged_pages_90d.csv

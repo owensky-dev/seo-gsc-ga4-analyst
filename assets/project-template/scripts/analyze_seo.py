@@ -62,9 +62,12 @@ def weighted_average(values: pd.Series, weights: pd.Series) -> float:
     return float((values[valid] * weights[valid]).sum() / weights[valid].sum())
 
 
-def load_inputs(gsc_path: Path, ga4_path: Path, site_url: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_inputs(
+    gsc_path: Path, ga4_path: Path, ga4_funnel_path: Path, site_url: str
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     gsc = pd.read_csv(gsc_path) if gsc_path.exists() else pd.DataFrame()
     ga4 = pd.read_csv(ga4_path) if ga4_path.exists() else pd.DataFrame()
+    ga4_funnel = pd.read_csv(ga4_funnel_path) if ga4_funnel_path.exists() else pd.DataFrame()
 
     if gsc.empty:
         raise RuntimeError(f"GSC CSV is empty or missing: {gsc_path}")
@@ -83,10 +86,20 @@ def load_inputs(gsc_path: Path, ga4_path: Path, site_url: str) -> tuple[pd.DataF
     for column in ["sessions", "engagedSessions", "conversions", "totalRevenue"]:
         ga4[column] = pd.to_numeric(ga4[column], errors="coerce").fillna(0)
 
-    return gsc, ga4
+    if not ga4_funnel.empty:
+        ga4_funnel["landing_page_url"] = ga4_funnel["landing_page_url"].fillna("").map(
+            lambda value: normalize_url(str(value), site_url)
+        )
+        ga4_funnel["eventCount"] = pd.to_numeric(
+            ga4_funnel["eventCount"], errors="coerce"
+        ).fillna(0)
+
+    return gsc, ga4, ga4_funnel
 
 
-def build_aggregates(gsc: pd.DataFrame, ga4: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def build_aggregates(
+    gsc: pd.DataFrame, ga4: pd.DataFrame, ga4_funnel: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     gsc_pages = (
         gsc.groupby("page_url", dropna=False)
         .apply(
@@ -132,6 +145,39 @@ def build_aggregates(gsc: pd.DataFrame, ga4: pd.DataFrame) -> tuple[pd.DataFrame
         lambda row: row["conversions"] / row["sessions"] if row["sessions"] else 0,
         axis=1,
     )
+    if ga4_funnel.empty:
+        ga4_pages["add_to_cart"] = 0.0
+        ga4_pages["begin_checkout"] = 0.0
+    else:
+        funnel_pages = (
+            ga4_funnel.pivot_table(
+                index="landing_page_url",
+                columns="eventName",
+                values="eventCount",
+                aggfunc="sum",
+                fill_value=0,
+            )
+            .reset_index()
+        )
+        for column in ["add_to_cart", "begin_checkout"]:
+            if column not in funnel_pages:
+                funnel_pages[column] = 0.0
+        ga4_pages = ga4_pages.merge(
+            funnel_pages[["landing_page_url", "add_to_cart", "begin_checkout"]],
+            on="landing_page_url",
+            how="left",
+        )
+        ga4_pages[["add_to_cart", "begin_checkout"]] = ga4_pages[
+            ["add_to_cart", "begin_checkout"]
+        ].fillna(0)
+    ga4_pages["add_to_cart_rate"] = ga4_pages.apply(
+        lambda row: row["add_to_cart"] / row["sessions"] if row["sessions"] else 0,
+        axis=1,
+    )
+    ga4_pages["cart_to_checkout_rate"] = ga4_pages.apply(
+        lambda row: row["begin_checkout"] / row["add_to_cart"] if row["add_to_cart"] else 0,
+        axis=1,
+    )
 
     merged = gsc_pages.merge(
         ga4_pages,
@@ -151,6 +197,10 @@ def build_aggregates(gsc: pd.DataFrame, ga4: pd.DataFrame) -> tuple[pd.DataFrame
         "conversions",
         "totalRevenue",
         "conversion_rate",
+        "add_to_cart",
+        "begin_checkout",
+        "add_to_cart_rate",
+        "cart_to_checkout_rate",
     ]:
         merged[column] = pd.to_numeric(merged[column], errors="coerce").fillna(0)
     merged = merged.drop(columns=["landing_page_url"])
@@ -342,6 +392,8 @@ def write_outputs(
     total_sessions = merged["sessions"].sum()
     total_conversions = merged["conversions"].sum()
     total_revenue = merged["totalRevenue"].sum()
+    total_add_to_cart = merged["add_to_cart"].sum()
+    total_begin_checkout = merged["begin_checkout"].sum()
 
     lines = [
         f"# {site_name} SEO 机会报告",
@@ -355,6 +407,8 @@ def write_outputs(
         f"- GA4 Organic Sessions: {total_sessions:,.0f}",
         f"- GA4 Organic Conversions: {total_conversions:,.2f}",
         f"- GA4 Organic Revenue: ${total_revenue:,.2f}",
+        f"- GA4 Organic Add to cart: {total_add_to_cart:,.0f}",
+        f"- GA4 Organic Begin checkout: {total_begin_checkout:,.0f}",
         "",
         "## 优先行动清单",
         "",
@@ -384,12 +438,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Merge GSC and GA4 data and build SEO opportunity reports.")
     parser.add_argument("--gsc", default=str(DATA_RAW_DIR / "gsc_90d.csv"))
     parser.add_argument("--ga4", default=str(DATA_RAW_DIR / "ga4_organic_landing_pages_90d.csv"))
+    parser.add_argument("--ga4-funnel", default=str(DATA_RAW_DIR / "ga4_organic_funnel_90d.csv"))
     args = parser.parse_args()
 
     settings = load_settings()
     ensure_dirs()
-    gsc, ga4 = load_inputs(Path(args.gsc), Path(args.ga4), settings["SITE_BASE_URL"])
-    gsc_pages, gsc_keywords, merged = build_aggregates(gsc, ga4)
+    gsc, ga4, ga4_funnel = load_inputs(
+        Path(args.gsc), Path(args.ga4), Path(args.ga4_funnel), settings["SITE_BASE_URL"]
+    )
+    gsc_pages, gsc_keywords, merged = build_aggregates(gsc, ga4, ga4_funnel)
     opportunities = build_opportunities(gsc, gsc_keywords, merged)
     write_outputs(settings["SITE_NAME"], gsc_pages, gsc_keywords, merged, opportunities)
     print(

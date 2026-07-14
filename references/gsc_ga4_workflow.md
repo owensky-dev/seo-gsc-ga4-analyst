@@ -19,12 +19,22 @@ GSC metrics:
 
 GA4 Organic Search landing page data should use:
 
+- `date`
 - `landingPagePlusQueryString`
 - `sessionDefaultChannelGroup`
 - `sessions`
 - `engagedSessions`
 - `conversions`
 - `totalRevenue`
+
+GA4 Organic funnel events must use a separate query with:
+
+- `date`
+- `landingPagePlusQueryString`
+- `eventName`, filtered to `add_to_cart` and `begin_checkout`
+- `eventCount`
+
+Do not add `eventName` to the landing-page Sessions query because it changes the aggregation grain. Strip the query string before persisting funnel landing-page values. Use the dated landing-page rows as coverage and the separate event rows for daily/weekly funnel totals.
 
 Normalize URLs before joining. Strip query strings and fragments, lowercase hostnames, preserve the path, and remove trailing slashes except for the homepage.
 
