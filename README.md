@@ -4,6 +4,8 @@
 
 Codex skill for building a local SEO data analysis workflow with Google Search Console API and GA4 Data API.
 
+中文说明请见 [README.zh-CN.md](README.zh-CN.md)。
+
 It helps Codex scaffold a Python project, fetch GSC and GA4 Organic Search data, merge both sources by landing page, diagnose SEO opportunities, and generate execution-focused SEO reports.
 
 ## What It Does
