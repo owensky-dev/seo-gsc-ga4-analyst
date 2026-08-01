@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/owensky-dev/seo-gsc-ga4-analyst/actions/workflows/ci.yml/badge.svg)](https://github.com/owensky-dev/seo-gsc-ga4-analyst/actions/workflows/ci.yml)
 
-[English README](README.md)
+[English README](README.en.md)
 
 一个给 Codex 使用的 SEO 数据分析 Skill：将 Google Search Console（GSC）的搜索表现与 Google Analytics 4（GA4）的自然流量和关键行为合并，产出可以直接进入运营排期的 SEO 周报和行动清单。
 
@@ -176,3 +176,13 @@ assets/project-template/
 ## 推荐 GitHub Topics
 
 `codex-skill`, `seo`, `google-search-console`, `ga4`, `data-analysis`, `python`, `search-console-api`, `analytics`
+
+## 关注公众号
+
+如果这个 Skill 对你有帮助，欢迎关注微信公众号 **虎皮叔叔聊跨境独立站**，获取更多独立站增长、SEO 数据分析与 AI 营销实操内容。
+
+<p align="center">
+  <img src="assets/wechat-qr.png" alt="虎皮叔叔聊跨境独立站公众号二维码" width="900">
+</p>
+
+<p align="center">微信扫码关注「虎皮叔叔聊跨境独立站」</p>
