@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -11,12 +12,28 @@ import pandas as pd
 TEMPLATE_SCRIPTS = Path(__file__).resolve().parents[1] / "assets" / "project-template" / "scripts"
 sys.path.insert(0, str(TEMPLATE_SCRIPTS))
 
-from fetch_ga4 import build_organic_funnel_request, build_organic_landing_request
 from analyze_seo import build_aggregates
+from config import default_gsc_date_range
+from fetch_ga4 import build_organic_funnel_request, build_organic_landing_request
+from ga4_contract import (
+    build_ga4_manifest,
+    load_and_validate_ga4_artifacts,
+    write_ga4_manifest,
+)
 from weekly_report import organic_funnel_comparison
 
 
 class OrganicFunnelTests(unittest.TestCase):
+    def test_default_workflow_window_ends_three_days_ago(self) -> None:
+        start_date, end_date = default_gsc_date_range()
+        expected_end = date.today() - timedelta(days=3)
+
+        self.assertEqual(end_date, expected_end.isoformat())
+        self.assertEqual(
+            (date.fromisoformat(end_date) - date.fromisoformat(start_date)).days,
+            89,
+        )
+
     def test_ga4_requests_keep_sessions_and_dated_events_separate(self) -> None:
         landing = build_organic_landing_request("properties/1", "2026-07-01", "2026-07-07", 100, 0)
         funnel = build_organic_funnel_request("properties/1", "2026-07-01", "2026-07-07", 100, 0)
@@ -41,11 +58,48 @@ class OrganicFunnelTests(unittest.TestCase):
                     {"date": "2026-07-06", "eventName": "begin_checkout", "eventCount": 3},
                 ]
             ).to_csv(root / "funnel.csv", index=False)
-            result = organic_funnel_comparison(root / "landing.csv", root / "funnel.csv")
+            result = organic_funnel_comparison(
+                root / "landing.csv", root / "funnel.csv", "2026-07-07"
+            )
         self.assertIsNotNone(result)
         self.assertEqual(result["current"]["add_to_cart"], 4)
         self.assertEqual(result["current"]["begin_checkout"], 3)
         self.assertEqual(result["previous"]["add_to_cart"], 2)
+
+    def test_ga4_manifest_must_match_the_shared_gsc_window(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = {
+                "landing": root / "ga4_organic_landing_pages_90d.csv",
+                "funnel": root / "ga4_organic_funnel_90d.csv",
+            }
+            frames = {
+                "landing": pd.DataFrame(
+                    [{"date": "2026-08-15", "sessions": 10}]
+                ),
+                "funnel": pd.DataFrame(
+                    [{"date": "2026-08-15", "eventName": "add_to_cart"}]
+                ),
+            }
+            for stream_name, frame in frames.items():
+                frame.to_csv(paths[stream_name], index=False)
+            manifest_path = root / "ga4_fetch_manifest.json"
+            manifest = build_ga4_manifest(
+                "2026-05-18",
+                "2026-08-15",
+                paths,
+                {name: frame.to_dict("records") for name, frame in frames.items()},
+            )
+            write_ga4_manifest(manifest_path, manifest)
+
+            with self.assertRaisesRegex(RuntimeError, "window mismatch"):
+                load_and_validate_ga4_artifacts(
+                    manifest_path,
+                    "2026-05-19",
+                    "2026-08-16",
+                    paths,
+                    frames,
+                )
 
     def test_page_aggregates_include_funnel_events(self) -> None:
         gsc = pd.DataFrame(

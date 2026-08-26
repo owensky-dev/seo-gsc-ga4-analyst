@@ -12,6 +12,7 @@
 
 - 分别拉取近 90 天 GSC 站点日汇总、页面日汇总和查询明细，避免匿名查询导致总量被低估。
 - 拉取近 90 天 GA4 Organic Search 落地页、Sessions、转化与收入数据。
+- GSC 与 GA4 默认使用同一个截至 3 天前的完整 90 天窗口，并用 sidecar manifest 验证请求参数、文件哈希和实际数据范围。
 - 单独保留按日期的 `add_to_cart` 和 `begin_checkout` 漏斗数据，避免用汇总数字掩盖漏斗变化。
 - 按标准化 URL 合并 GSC 页面与 GA4 落地页，判断问题在搜索端还是页面承接端。
 - 自动识别高展示低 CTR、排名 8–20 名、近期点击下滑、自然流量高但转化弱、关键词与页面不匹配及内容缺口。
@@ -102,15 +103,22 @@ python3 -m venv .venv
 data/raw/gsc_90d.csv
 data/raw/gsc_daily_90d.csv
 data/raw/gsc_page_daily_90d.csv
+data/raw/gsc_fetch_manifest.json
 data/raw/ga4_organic_landing_pages_90d.csv
 data/raw/ga4_organic_funnel_90d.csv
+data/raw/ga4_fetch_manifest.json
 data/processed/gsc_pages_90d.csv
 data/processed/gsc_keywords_90d.csv
 data/processed/seo_merged_pages_90d.csv
+data/processed/seo_analysis_manifest.json
 reports/seo_opportunities.md
 reports/seo_opportunities.csv
 reports/seo_weekly_report.md
 ```
+
+GSC 会合法省略零数据日期，因此不要求 CSV 每个自然日都有一行。分析会校验 fetch manifest 已完整请求同一预期窗口，且返回日期、文件哈希和请求口径一致；旧 14 天文件不能通过默认 90 天验收。最近 28 天与前 28 天对比要求 manifest 证明至少覆盖完整 56 天，缺失的零数据日才按 0 计算。
+
+`analyze_seo.py` 成功后会原子写入 `seo_analysis_manifest.json`，绑定本次 GSC/GA4 manifest 与 processed/机会文件。若只刷新 raw 而未重新分析，`weekly_report.py` 会停止，避免新 raw 与旧 processed 混用。显式历史周期请给四个命令传入相同的 `--start-date` 和 `--end-date`。
 
 周报应优先回答这些实际问题：
 
@@ -153,6 +161,7 @@ reports/seo_weekly_report.md
 
 - **GSC 返回 403 或无数据：** 确认服务账号已被加入 Search Console，且 `GSC_SITE_URL` 与已验证资源完全一致。仅在同时拥有两个资源时，再尝试 `https://example.com/` 与 `sc-domain:example.com` 两种格式。
 - **GSC 明细合计小于后台总量：** 查询维度会排除匿名查询。站点 KPI 只读取 `gsc_daily_90d.csv`，页面指标只读取 `gsc_page_daily_90d.csv`；缺失时停止，不用查询明细回填。
+- **刷新 raw 后周报拒绝生成：** 这是防止混用旧 processed 的保护；重新运行 `scripts/analyze_seo.py` 后再运行 `scripts/weekly_report.py`。
 - **GA4 权限错误：** 将服务账号邮箱加入对应 GA4 Property，授予 Viewer 或 Analyst 权限。
 - **GA4 收入为 0：** 这可能是电商事件埋点或归因设置问题，不必然代表 SEO 没有价值。
 - **GA4 落地页为 `(not set)`：** 应将其单独处理或过滤，以保留可执行的页面级建议。
@@ -169,7 +178,10 @@ assets/project-template/
   .gitignore
   requirements.txt
   scripts/
+    analysis_contract.py
     config.py
+    ga4_contract.py
+    gsc_contract.py
     fetch_gsc.py
     fetch_ga4.py
     analyze_seo.py

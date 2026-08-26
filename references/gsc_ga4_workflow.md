@@ -15,7 +15,7 @@ All three tables use these metrics:
 - `ctr`
 - `position`
 
-Do not sum the query-detail table into site or page KPIs. GSC omits anonymized queries from query-grain results, so those sums can be materially lower than Search Console's property totals. Fail closed when either daily table is missing, empty, or does not cover the latest 14 consecutive available days; never substitute query detail.
+Do not sum the query-detail table into site or page KPIs. GSC omits anonymized queries from query-grain results, so those sums can be materially lower than Search Console's property totals. Fail closed when either daily table or its completed fetch manifest is missing, empty, or inconsistent; never substitute query detail.
 
 GA4 Organic Search landing page data should use:
 
@@ -37,6 +37,24 @@ GA4 Organic funnel events must use a separate query with:
 Do not add `eventName` to the landing-page Sessions query because it changes the aggregation grain. Strip the query string before persisting funnel landing-page values. Use the dated landing-page rows as coverage and the separate event rows for daily/weekly funnel totals.
 
 Normalize URLs before joining. Strip query strings and fragments, lowercase hostnames, preserve the path, and remove trailing slashes except for the homepage.
+
+## Window and Manifest Contract
+
+Use one inclusive expected date window for all GSC and GA4 streams. The default workflow window is 90 days ending `today - 3 days`; GSC, GA4, `analyze_seo.py`, and `weekly_report.py` must calculate or receive the same start and end. Explicit historical runs must pass the same `--start-date` and `--end-date` to all four commands.
+
+Successful fetches write `gsc_fetch_manifest.json` and `ga4_fetch_manifest.json`. Validate before analysis:
+
+- `status=complete`, supported manifest version, and the exact expected start/end.
+- Each stream's dimensions, filters, `type=web`, aggregation type, and page-size contract.
+- CSV file name, SHA-256, and row count.
+- Every returned date is inside the expected window.
+- GSC site-daily and page-daily requests use the same expected window.
+
+Search Analytics may omit a calendar date when it has no data. The completed sidecar manifest proves the full date range was requested, so missing natural-day rows are valid and must not be treated as a failed fetch. Conversely, a short or stale CSV cannot prove coverage: a previous 14-day manifest must fail a current 90-day run even if its latest row looks fresh.
+
+The recent-28-days versus prior-28-days calculation requires the manifest-proven expected window to cover at least 56 inclusive days. Anchor both periods to the expected end date, and treat omitted dates as zero only after the request contract passes.
+
+After analysis succeeds, write `data/processed/seo_analysis_manifest.json` atomically. It binds the expected window, both current fetch-manifest hashes, and the hashes of processed page/keyword/merged tables plus opportunity outputs. The weekly report must validate this manifest before reading processed data. If raw data is refreshed without rerunning analysis, fail closed rather than mixing new source totals with stale processed rows.
 
 ## Opportunity Logic
 

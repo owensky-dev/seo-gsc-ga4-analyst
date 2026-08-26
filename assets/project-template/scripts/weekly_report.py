@@ -1,23 +1,35 @@
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 import pandas as pd
 
-from config import DATA_PROCESSED_DIR, DATA_RAW_DIR, REPORTS_DIR, ensure_dirs, load_settings
+from analysis_contract import load_and_validate_analysis_artifacts
+from config import (
+    DATA_PROCESSED_DIR,
+    DATA_RAW_DIR,
+    REPORTS_DIR,
+    default_gsc_date_range,
+    ensure_dirs,
+    load_settings,
+)
 from analyze_seo import (
     prepare_gsc_page_daily,
     prepare_gsc_site_daily,
     summarize_gsc_site,
-    validate_gsc_daily_alignment,
 )
+from ga4_contract import load_and_validate_ga4_artifacts
+from gsc_contract import load_and_validate_gsc_artifacts
 
 
 def money(value: float) -> str:
     return f"${value:,.2f}"
 
 
-def organic_funnel_comparison(landing_path: Path, funnel_path: Path) -> dict | None:
+def organic_funnel_comparison(
+    landing_path: Path, funnel_path: Path, expected_end: str
+) -> dict | None:
     if not landing_path.exists() or not funnel_path.exists():
         return None
     landing = pd.read_csv(landing_path)
@@ -26,9 +38,7 @@ def organic_funnel_comparison(landing_path: Path, funnel_path: Path) -> dict | N
         return None
     landing["date"] = pd.to_datetime(landing["date"], errors="coerce")
     funnel["date"] = pd.to_datetime(funnel.get("date"), errors="coerce")
-    latest = landing["date"].max()
-    if pd.isna(latest):
-        return None
+    latest = pd.Timestamp(expected_end)
 
     def summarize(start: pd.Timestamp, end: pd.Timestamp) -> dict:
         landing_slice = landing[landing["date"].between(start, end)]
@@ -63,27 +73,82 @@ def organic_funnel_comparison(landing_path: Path, funnel_path: Path) -> dict | N
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Write the GSC and GA4 SEO weekly report.")
+    parser.add_argument("--days", type=int, default=90)
+    parser.add_argument("--start-date")
+    parser.add_argument("--end-date")
+    parser.add_argument("--finalized-lag-days", type=int, default=3)
+    parser.add_argument(
+        "--gsc-manifest", default=str(DATA_RAW_DIR / "gsc_fetch_manifest.json")
+    )
+    parser.add_argument(
+        "--ga4-manifest", default=str(DATA_RAW_DIR / "ga4_fetch_manifest.json")
+    )
+    parser.add_argument(
+        "--analysis-manifest",
+        default=str(DATA_PROCESSED_DIR / "seo_analysis_manifest.json"),
+    )
+    args = parser.parse_args()
+
     settings = load_settings()
     ensure_dirs()
+    if bool(args.start_date) != bool(args.end_date):
+        raise RuntimeError("--start-date and --end-date must be provided together")
+    expected_start, expected_end = (
+        (args.start_date, args.end_date)
+        if args.start_date
+        else default_gsc_date_range(args.days, args.finalized_lag_days)
+    )
     merged_path = DATA_PROCESSED_DIR / "seo_merged_pages_90d.csv"
     keywords_path = DATA_PROCESSED_DIR / "gsc_keywords_90d.csv"
     opportunities_path = REPORTS_DIR / "seo_opportunities.csv"
-
-    if not merged_path.exists() or not keywords_path.exists() or not opportunities_path.exists():
-        raise RuntimeError("请先运行 python3 scripts/analyze_seo.py 生成 processed 数据和机会报告。")
-
-    merged = pd.read_csv(merged_path)
-    keywords = pd.read_csv(keywords_path)
-    opportunities = pd.read_csv(opportunities_path)
+    gsc_path = DATA_RAW_DIR / "gsc_90d.csv"
     gsc_daily_path = DATA_RAW_DIR / "gsc_daily_90d.csv"
-    gsc_daily = pd.read_csv(gsc_daily_path) if gsc_daily_path.exists() else pd.DataFrame()
-    gsc_daily = prepare_gsc_site_daily(gsc_daily)
     gsc_page_daily_path = DATA_RAW_DIR / "gsc_page_daily_90d.csv"
+    gsc = pd.read_csv(gsc_path) if gsc_path.exists() else pd.DataFrame()
+    gsc_daily = pd.read_csv(gsc_daily_path) if gsc_daily_path.exists() else pd.DataFrame()
     gsc_page_daily = (
         pd.read_csv(gsc_page_daily_path) if gsc_page_daily_path.exists() else pd.DataFrame()
     )
-    gsc_page_daily = prepare_gsc_page_daily(gsc_page_daily, settings["SITE_BASE_URL"])
-    validate_gsc_daily_alignment(gsc_daily, gsc_page_daily)
+    _, gsc_artifacts = load_and_validate_gsc_artifacts(
+        Path(args.gsc_manifest),
+        expected_start,
+        expected_end,
+        {"detail": gsc_path, "site_daily": gsc_daily_path, "page_daily": gsc_page_daily_path},
+        {"detail": gsc, "site_daily": gsc_daily, "page_daily": gsc_page_daily},
+    )
+    ga4_path = DATA_RAW_DIR / "ga4_organic_landing_pages_90d.csv"
+    ga4_funnel_path = DATA_RAW_DIR / "ga4_organic_funnel_90d.csv"
+    ga4 = pd.read_csv(ga4_path) if ga4_path.exists() else pd.DataFrame()
+    ga4_funnel = pd.read_csv(ga4_funnel_path) if ga4_funnel_path.exists() else pd.DataFrame()
+    load_and_validate_ga4_artifacts(
+        Path(args.ga4_manifest),
+        expected_start,
+        expected_end,
+        {"landing": ga4_path, "funnel": ga4_funnel_path},
+        {"landing": ga4, "funnel": ga4_funnel},
+    )
+    load_and_validate_analysis_artifacts(
+        Path(args.analysis_manifest),
+        expected_start,
+        expected_end,
+        {
+            "gsc": Path(args.gsc_manifest),
+            "ga4": Path(args.ga4_manifest),
+        },
+        {
+            "gsc_pages": DATA_PROCESSED_DIR / "gsc_pages_90d.csv",
+            "gsc_keywords": keywords_path,
+            "seo_merged_pages": merged_path,
+            "seo_opportunities_csv": opportunities_path,
+            "seo_opportunities_md": REPORTS_DIR / "seo_opportunities.md",
+        },
+    )
+    merged = pd.read_csv(merged_path)
+    keywords = pd.read_csv(keywords_path)
+    opportunities = pd.read_csv(opportunities_path)
+    gsc_daily = prepare_gsc_site_daily(gsc_artifacts["site_daily"])
+    prepare_gsc_page_daily(gsc_artifacts["page_daily"], settings["SITE_BASE_URL"])
     gsc_summary = summarize_gsc_site(gsc_daily)
 
     clicks = gsc_summary["clicks"]
@@ -93,9 +158,11 @@ def main() -> None:
     sessions = merged["sessions"].sum()
     conversions = merged["conversions"].sum()
     revenue = merged["totalRevenue"].sum()
+    window_days = (pd.Timestamp(expected_end) - pd.Timestamp(expected_start)).days + 1
     funnel = organic_funnel_comparison(
-        DATA_RAW_DIR / "ga4_organic_landing_pages_90d.csv",
-        DATA_RAW_DIR / "ga4_organic_funnel_90d.csv",
+        ga4_path,
+        ga4_funnel_path,
+        expected_end,
     )
 
     top_pages = merged.sort_values("clicks", ascending=False).head(10)
@@ -113,6 +180,7 @@ def main() -> None:
         "",
         "## 1. Organic Search 总览",
         "",
+        f"- 数据窗口: {expected_start} 至 {expected_end}（{window_days}天）",
         f"- Clicks: {clicks:,.0f}",
         f"- Impressions: {impressions:,.0f}",
         f"- CTR: {ctr:.2%}",

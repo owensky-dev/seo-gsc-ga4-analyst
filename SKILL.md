@@ -43,6 +43,8 @@ The GA4 fetch must keep landing-page Sessions and ecommerce events in separate r
 
 The GSC fetch must keep three grains in separate requests: `date` with `aggregationType=byProperty` for site KPIs, `date,page` with `aggregationType=byPage` for page totals and decline analysis, and `date,page,query,country,device` for query/intent detail. Use `type=web` for all three. Never sum query detail into site or page KPIs because anonymized queries make that detail non-additive.
 
+Use one shared expected window for GSC, GA4, analysis, and the weekly report. The default is 90 inclusive days ending three days ago so the workflow avoids the usual GSC finalization lag. For an explicit historical run, pass the same `--start-date` and `--end-date` to all four commands.
+
 4. When network access is restricted, retry API fetch commands with the appropriate approval path. Explain that GSC/GA4 calls require outbound network access.
 
 5. Validate outputs before reporting success:
@@ -50,16 +52,21 @@ The GSC fetch must keep three grains in separate requests: `date` with `aggregat
 - `data/raw/gsc_90d.csv`
 - `data/raw/gsc_daily_90d.csv`
 - `data/raw/gsc_page_daily_90d.csv`
+- `data/raw/gsc_fetch_manifest.json`
 - `data/raw/ga4_organic_landing_pages_90d.csv`
 - `data/raw/ga4_organic_funnel_90d.csv`
+- `data/raw/ga4_fetch_manifest.json`
 - `data/processed/gsc_pages_90d.csv`
 - `data/processed/gsc_keywords_90d.csv`
 - `data/processed/seo_merged_pages_90d.csv`
+- `data/processed/seo_analysis_manifest.json`
 - `reports/seo_opportunities.md`
 - `reports/seo_opportunities.csv`
 - `reports/seo_weekly_report.md`
 
-Treat the two GSC daily tables as required inputs. If either is missing, empty, or lacks the latest 14 consecutive days, stop instead of falling back to query detail.
+Treat the two GSC daily tables and both fetch manifests as required inputs. GSC may omit dates with zero data, so do not require one row per calendar day. Instead, require completed manifests whose exact request window and parameters match the shared expected window, whose file hashes and row counts match, and whose returned dates stay inside that window. The site and page daily streams must share the same contract; never fall back to query detail.
+
+The 28-day click-decline comparison requires a manifest-proven window of at least 56 days. Treat omitted dates as zero only after that request contract passes. `weekly_report.py` must also validate `seo_analysis_manifest.json`; if a fetch manifest or bound processed artifact changed after analysis, stop and rerun `analyze_seo.py` before writing the weekly report.
 
 ## Diagnosis Standards
 

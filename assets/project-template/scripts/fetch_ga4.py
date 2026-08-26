@@ -16,7 +16,8 @@ from google.analytics.data_v1beta.types import (
 )
 from google.oauth2 import service_account
 
-from config import DATA_RAW_DIR, default_date_range, ensure_dirs, load_settings, normalize_url
+from config import DATA_RAW_DIR, default_gsc_date_range, ensure_dirs, load_settings, normalize_url
+from ga4_contract import build_ga4_manifest, write_ga4_manifest
 
 
 COLUMNS = [
@@ -199,16 +200,20 @@ def main() -> None:
     parser.add_argument("--days", type=int, default=90)
     parser.add_argument("--start-date")
     parser.add_argument("--end-date")
+    parser.add_argument("--finalized-lag-days", type=int, default=3)
     parser.add_argument("--out", default=str(DATA_RAW_DIR / "ga4_organic_landing_pages_90d.csv"))
     parser.add_argument("--funnel-out", default=str(DATA_RAW_DIR / "ga4_organic_funnel_90d.csv"))
+    parser.add_argument("--manifest-out", default=str(DATA_RAW_DIR / "ga4_fetch_manifest.json"))
     args = parser.parse_args()
 
     settings = load_settings()
     ensure_dirs()
+    if bool(args.start_date) != bool(args.end_date):
+        raise RuntimeError("--start-date and --end-date must be provided together")
     start_date, end_date = (
         (args.start_date, args.end_date)
-        if args.start_date and args.end_date
-        else default_date_range(args.days)
+        if args.start_date
+        else default_gsc_date_range(args.days, args.finalized_lag_days)
     )
 
     rows = fetch_ga4_rows(
@@ -231,9 +236,18 @@ def main() -> None:
     funnel_output_path = Path(args.funnel_out)
     funnel_output_path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(funnel_rows, columns=FUNNEL_COLUMNS).to_csv(funnel_output_path, index=False)
+    manifest_output_path = Path(args.manifest_out)
+    manifest = build_ga4_manifest(
+        start_date,
+        end_date,
+        {"landing": output_path, "funnel": funnel_output_path},
+        {"landing": rows, "funnel": funnel_rows},
+    )
+    write_ga4_manifest(manifest_output_path, manifest)
     print(
         f"GA4 rows={len(rows)} funnel_rows={len(funnel_rows)} "
-        f"date_range={start_date}..{end_date} out={output_path} funnel_out={funnel_output_path}"
+        f"date_range={start_date}..{end_date} out={output_path} "
+        f"funnel_out={funnel_output_path} manifest_out={manifest_output_path}"
     )
 
 

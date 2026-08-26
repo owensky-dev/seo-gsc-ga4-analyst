@@ -7,13 +7,18 @@ import pandas as pd
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
-from config import DATA_RAW_DIR, default_date_range, ensure_dirs, load_settings
+from config import DATA_RAW_DIR, default_gsc_date_range, ensure_dirs, load_settings
+from gsc_contract import (
+    STREAM_SPECS,
+    build_gsc_manifest,
+    write_gsc_manifest,
+)
 
 
 SCOPES = ["https://www.googleapis.com/auth/webmasters.readonly"]
-DETAIL_DIMENSIONS = ["date", "page", "query", "country", "device"]
-SITE_DAILY_DIMENSIONS = ["date"]
-PAGE_DAILY_DIMENSIONS = ["date", "page"]
+DETAIL_DIMENSIONS = STREAM_SPECS["detail"]["dimensions"]
+SITE_DAILY_DIMENSIONS = STREAM_SPECS["site_daily"]["dimensions"]
+PAGE_DAILY_DIMENSIONS = STREAM_SPECS["page_daily"]["dimensions"]
 DETAIL_COLUMNS = [
     "date",
     "page",
@@ -112,17 +117,22 @@ def main() -> None:
     parser.add_argument("--days", type=int, default=90)
     parser.add_argument("--start-date")
     parser.add_argument("--end-date")
+    parser.add_argument("--finalized-lag-days", type=int, default=3)
+    parser.add_argument("--row-limit", type=int, default=25000)
     parser.add_argument("--out", default=str(DATA_RAW_DIR / "gsc_90d.csv"))
     parser.add_argument("--daily-out", default=str(DATA_RAW_DIR / "gsc_daily_90d.csv"))
     parser.add_argument("--page-daily-out", default=str(DATA_RAW_DIR / "gsc_page_daily_90d.csv"))
+    parser.add_argument("--manifest-out", default=str(DATA_RAW_DIR / "gsc_fetch_manifest.json"))
     args = parser.parse_args()
 
     settings = load_settings()
     ensure_dirs()
+    if bool(args.start_date) != bool(args.end_date):
+        raise RuntimeError("--start-date and --end-date must be provided together")
     start_date, end_date = (
         (args.start_date, args.end_date)
-        if args.start_date and args.end_date
-        else default_date_range(args.days)
+        if args.start_date
+        else default_gsc_date_range(args.days, args.finalized_lag_days)
     )
 
     rows = fetch_gsc_rows(
@@ -130,12 +140,14 @@ def main() -> None:
         site_url=settings["GSC_SITE_URL"],
         start_date=start_date,
         end_date=end_date,
+        row_limit=args.row_limit,
     )
     daily_rows = fetch_gsc_rows(
         key_file=settings["GOOGLE_APPLICATION_CREDENTIALS"],
         site_url=settings["GSC_SITE_URL"],
         start_date=start_date,
         end_date=end_date,
+        row_limit=args.row_limit,
         dimensions=SITE_DAILY_DIMENSIONS,
         aggregation_type="byProperty",
     )
@@ -144,6 +156,7 @@ def main() -> None:
         site_url=settings["GSC_SITE_URL"],
         start_date=start_date,
         end_date=end_date,
+        row_limit=args.row_limit,
         dimensions=PAGE_DAILY_DIMENSIONS,
         aggregation_type="byPage",
     )
@@ -163,10 +176,30 @@ def main() -> None:
     pd.DataFrame(page_daily_rows, columns=PAGE_DAILY_COLUMNS).to_csv(
         page_daily_output_path, index=False
     )
+    manifest_output_path = Path(args.manifest_out)
+    stream_paths = {
+        "detail": output_path,
+        "site_daily": daily_output_path,
+        "page_daily": page_daily_output_path,
+    }
+    stream_rows = {
+        "detail": rows,
+        "site_daily": daily_rows,
+        "page_daily": page_daily_rows,
+    }
+    manifest = build_gsc_manifest(
+        start_date,
+        end_date,
+        args.row_limit,
+        stream_paths,
+        stream_rows,
+    )
+    write_gsc_manifest(manifest_output_path, manifest)
     print(
         f"GSC detail_rows={len(rows)} site_daily_rows={len(daily_rows)} "
         f"page_daily_rows={len(page_daily_rows)} date_range={start_date}..{end_date} "
-        f"out={output_path} daily_out={daily_output_path} page_daily_out={page_daily_output_path}"
+        f"out={output_path} daily_out={daily_output_path} "
+        f"page_daily_out={page_daily_output_path} manifest_out={manifest_output_path}"
     )
 
 

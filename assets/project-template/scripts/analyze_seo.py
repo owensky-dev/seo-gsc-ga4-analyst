@@ -6,14 +6,18 @@ from pathlib import Path
 
 import pandas as pd
 
+from analysis_contract import build_analysis_manifest, write_analysis_manifest
 from config import (
     DATA_PROCESSED_DIR,
     DATA_RAW_DIR,
     REPORTS_DIR,
+    default_gsc_date_range,
     ensure_dirs,
     load_settings,
     normalize_url,
 )
+from ga4_contract import load_and_validate_ga4_artifacts
+from gsc_contract import load_and_validate_gsc_artifacts, validate_comparison_window
 
 
 QUESTION_MODIFIERS = (
@@ -62,7 +66,7 @@ def weighted_average(values: pd.Series, weights: pd.Series) -> float:
     return float((values[valid] * weights[valid]).sum() / weights[valid].sum())
 
 
-def prepare_gsc_site_daily(gsc_daily: pd.DataFrame, minimum_days: int = 14) -> pd.DataFrame:
+def prepare_gsc_site_daily(gsc_daily: pd.DataFrame) -> pd.DataFrame:
     required = {"date", "clicks", "impressions", "ctr", "position"}
     if gsc_daily.empty:
         raise RuntimeError("GSC site daily CSV is empty or missing")
@@ -79,14 +83,6 @@ def prepare_gsc_site_daily(gsc_daily: pd.DataFrame, minimum_days: int = 14) -> p
     for column in ["clicks", "impressions", "ctr", "position"]:
         prepared[column] = pd.to_numeric(prepared[column], errors="coerce").fillna(0)
 
-    latest = prepared["date"].max()
-    required_dates = set(pd.date_range(latest - pd.Timedelta(days=minimum_days - 1), latest, freq="D"))
-    missing_dates = sorted(required_dates - set(prepared["date"]))
-    if missing_dates:
-        sample = ", ".join(item.date().isoformat() for item in missing_dates[:5])
-        raise RuntimeError(
-            f"GSC site daily coverage is incomplete for the latest {minimum_days} days: {sample}"
-        )
     return prepared
 
 
@@ -122,22 +118,17 @@ def prepare_gsc_page_daily(gsc_page_daily: pd.DataFrame, site_url: str) -> pd.Da
     return prepared
 
 
-def validate_gsc_daily_alignment(
-    gsc_daily: pd.DataFrame, gsc_page_daily: pd.DataFrame
-) -> None:
-    missing_page_dates = sorted(set(gsc_daily["date"]) - set(gsc_page_daily["date"]))
-    if missing_page_dates:
-        sample = ", ".join(item.date().isoformat() for item in missing_page_dates[:5])
-        raise RuntimeError(f"GSC page daily coverage is missing site dates: {sample}")
-
-
 def load_inputs(
     gsc_path: Path,
     gsc_daily_path: Path,
     gsc_page_daily_path: Path,
+    gsc_manifest_path: Path,
     ga4_path: Path,
     ga4_funnel_path: Path,
+    ga4_manifest_path: Path,
     site_url: str,
+    expected_start: str,
+    expected_end: str,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     gsc = pd.read_csv(gsc_path) if gsc_path.exists() else pd.DataFrame()
     gsc_daily = pd.read_csv(gsc_daily_path) if gsc_daily_path.exists() else pd.DataFrame()
@@ -147,19 +138,37 @@ def load_inputs(
     ga4 = pd.read_csv(ga4_path) if ga4_path.exists() else pd.DataFrame()
     ga4_funnel = pd.read_csv(ga4_funnel_path) if ga4_funnel_path.exists() else pd.DataFrame()
 
+    _, gsc_artifacts = load_and_validate_gsc_artifacts(
+        gsc_manifest_path,
+        expected_start,
+        expected_end,
+        {
+            "detail": gsc_path,
+            "site_daily": gsc_daily_path,
+            "page_daily": gsc_page_daily_path,
+        },
+        {"detail": gsc, "site_daily": gsc_daily, "page_daily": gsc_page_daily},
+    )
+    _, ga4_artifacts = load_and_validate_ga4_artifacts(
+        ga4_manifest_path,
+        expected_start,
+        expected_end,
+        {"landing": ga4_path, "funnel": ga4_funnel_path},
+        {"landing": ga4, "funnel": ga4_funnel},
+    )
+    gsc = gsc_artifacts["detail"]
+    gsc_daily = prepare_gsc_site_daily(gsc_artifacts["site_daily"])
+    gsc_page_daily = prepare_gsc_page_daily(gsc_artifacts["page_daily"], site_url)
+    ga4 = ga4_artifacts["landing"]
+    ga4_funnel = ga4_artifacts["funnel"]
+
     if gsc.empty:
         raise RuntimeError(f"GSC CSV is empty or missing: {gsc_path}")
-    gsc_daily = prepare_gsc_site_daily(gsc_daily)
-    gsc_page_daily = prepare_gsc_page_daily(gsc_page_daily, site_url)
-    if ga4.empty:
-        raise RuntimeError(f"GA4 CSV is empty or missing: {ga4_path}")
 
     gsc["page_url"] = gsc["page"].map(lambda value: normalize_url(str(value), site_url))
     gsc["date"] = pd.to_datetime(gsc["date"], errors="coerce")
     for column in ["clicks", "impressions", "ctr", "position"]:
         gsc[column] = pd.to_numeric(gsc[column], errors="coerce").fillna(0)
-
-    validate_gsc_daily_alignment(gsc_daily, gsc_page_daily)
 
     ga4["landing_page_url"] = ga4["landingPagePlusQueryString"].fillna("").map(
         lambda value: normalize_url(str(value), site_url)
@@ -295,16 +304,18 @@ def build_aggregates(
 
 
 def click_drop_opportunities(
-    gsc_page_daily: pd.DataFrame, merged_by_page: pd.DataFrame
+    gsc_page_daily: pd.DataFrame,
+    merged_by_page: pd.DataFrame,
+    expected_start: str,
+    expected_end: str,
 ) -> list[Opportunity]:
-    max_date = gsc_page_daily["date"].max()
-    if pd.isna(max_date):
-        return []
-
-    current_start = max_date - pd.Timedelta(days=27)
+    _, comparison_end = validate_comparison_window(expected_start, expected_end)
+    current_start = comparison_end - pd.Timedelta(days=27)
     previous_start = current_start - pd.Timedelta(days=28)
     previous_end = current_start - pd.Timedelta(days=1)
-    current = gsc_page_daily[gsc_page_daily["date"].between(current_start, max_date)]
+    current = gsc_page_daily[
+        gsc_page_daily["date"].between(current_start, comparison_end)
+    ]
     previous = gsc_page_daily[gsc_page_daily["date"].between(previous_start, previous_end)]
     current_clicks = current.groupby("page_url")["clicks"].sum().rename("current_clicks")
     previous_clicks = previous.groupby("page_url")["clicks"].sum().rename("previous_clicks")
@@ -349,6 +360,8 @@ def build_opportunities(
     gsc_keywords: pd.DataFrame,
     merged: pd.DataFrame,
     site_ctr: float,
+    expected_start: str,
+    expected_end: str,
 ) -> list[Opportunity]:
     opportunities: list[Opportunity] = []
     min_page_impressions = max(100, float(merged["impressions"].quantile(0.65)))
@@ -400,7 +413,11 @@ def build_opportunities(
             )
         )
 
-    opportunities.extend(click_drop_opportunities(gsc_page_daily, merged))
+    opportunities.extend(
+        click_drop_opportunities(
+            gsc_page_daily, merged, expected_start, expected_end
+        )
+    )
 
     session_threshold = max(20, float(merged["sessions"].quantile(0.65)))
     positive_rates = merged.loc[merged["sessions"] > 0, "conversion_rate"]
@@ -467,6 +484,8 @@ def write_outputs(
     gsc_keywords: pd.DataFrame,
     merged: pd.DataFrame,
     opportunities: list[Opportunity],
+    expected_start: str,
+    expected_end: str,
 ) -> None:
     DATA_PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -489,11 +508,12 @@ def write_outputs(
     total_revenue = merged["totalRevenue"].sum()
     total_add_to_cart = merged["add_to_cart"].sum()
     total_begin_checkout = merged["begin_checkout"].sum()
+    window_days = (pd.Timestamp(expected_end) - pd.Timestamp(expected_start)).days + 1
 
     lines = [
         f"# {site_name} SEO 机会报告",
         "",
-        "## 90天总览",
+        f"## {window_days}天总览（{expected_start} 至 {expected_end}）",
         "",
         f"- GSC Clicks: {total_clicks:,.0f}",
         f"- GSC Impressions: {total_impressions:,.0f}",
@@ -531,31 +551,61 @@ def write_outputs(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Merge GSC and GA4 data and build SEO opportunity reports.")
+    parser.add_argument("--days", type=int, default=90)
+    parser.add_argument("--start-date")
+    parser.add_argument("--end-date")
+    parser.add_argument("--finalized-lag-days", type=int, default=3)
     parser.add_argument("--gsc", default=str(DATA_RAW_DIR / "gsc_90d.csv"))
     parser.add_argument("--gsc-daily", default=str(DATA_RAW_DIR / "gsc_daily_90d.csv"))
     parser.add_argument(
         "--gsc-page-daily", default=str(DATA_RAW_DIR / "gsc_page_daily_90d.csv")
     )
+    parser.add_argument(
+        "--gsc-manifest", default=str(DATA_RAW_DIR / "gsc_fetch_manifest.json")
+    )
     parser.add_argument("--ga4", default=str(DATA_RAW_DIR / "ga4_organic_landing_pages_90d.csv"))
     parser.add_argument("--ga4-funnel", default=str(DATA_RAW_DIR / "ga4_organic_funnel_90d.csv"))
+    parser.add_argument(
+        "--ga4-manifest", default=str(DATA_RAW_DIR / "ga4_fetch_manifest.json")
+    )
+    parser.add_argument(
+        "--analysis-manifest",
+        default=str(DATA_PROCESSED_DIR / "seo_analysis_manifest.json"),
+    )
     args = parser.parse_args()
 
     settings = load_settings()
     ensure_dirs()
+    if bool(args.start_date) != bool(args.end_date):
+        raise RuntimeError("--start-date and --end-date must be provided together")
+    expected_start, expected_end = (
+        (args.start_date, args.end_date)
+        if args.start_date
+        else default_gsc_date_range(args.days, args.finalized_lag_days)
+    )
     gsc, gsc_daily, gsc_page_daily, ga4, ga4_funnel = load_inputs(
         Path(args.gsc),
         Path(args.gsc_daily),
         Path(args.gsc_page_daily),
+        Path(args.gsc_manifest),
         Path(args.ga4),
         Path(args.ga4_funnel),
+        Path(args.ga4_manifest),
         settings["SITE_BASE_URL"],
+        expected_start,
+        expected_end,
     )
     gsc_pages, gsc_keywords, merged = build_aggregates(
         gsc, gsc_page_daily, ga4, ga4_funnel
     )
     site_summary = summarize_gsc_site(gsc_daily)
     opportunities = build_opportunities(
-        gsc_page_daily, gsc_keywords, merged, site_summary["ctr"]
+        gsc_page_daily,
+        gsc_keywords,
+        merged,
+        site_summary["ctr"],
+        expected_start,
+        expected_end,
     )
     write_outputs(
         settings["SITE_NAME"],
@@ -564,10 +614,30 @@ def main() -> None:
         gsc_keywords,
         merged,
         opportunities,
+        expected_start,
+        expected_end,
     )
+    artifact_paths = {
+        "gsc_pages": DATA_PROCESSED_DIR / "gsc_pages_90d.csv",
+        "gsc_keywords": DATA_PROCESSED_DIR / "gsc_keywords_90d.csv",
+        "seo_merged_pages": DATA_PROCESSED_DIR / "seo_merged_pages_90d.csv",
+        "seo_opportunities_csv": REPORTS_DIR / "seo_opportunities.csv",
+        "seo_opportunities_md": REPORTS_DIR / "seo_opportunities.md",
+    }
+    analysis_manifest = build_analysis_manifest(
+        expected_start,
+        expected_end,
+        {
+            "gsc": Path(args.gsc_manifest),
+            "ga4": Path(args.ga4_manifest),
+        },
+        artifact_paths,
+    )
+    write_analysis_manifest(Path(args.analysis_manifest), analysis_manifest)
     print(
         "SEO analysis complete "
-        f"pages={len(gsc_pages)} keywords={len(gsc_keywords)} opportunities={len(opportunities)}"
+        f"pages={len(gsc_pages)} keywords={len(gsc_keywords)} "
+        f"opportunities={len(opportunities)} manifest={args.analysis_manifest}"
     )
 
 
