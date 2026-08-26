@@ -109,9 +109,9 @@ reports/seo_opportunities.csv
 reports/seo_weekly_report.md
 ```
 
-Site KPIs use only `gsc_daily_90d.csv`; page totals and click-decline analysis use only `gsc_page_daily_90d.csv`; query detail remains limited to keyword, intent, and content-gap analysis. GSC may legitimately omit zero-data dates, so coverage is proven by the completed fetch manifest rather than consecutive CSV rows. A stale 14-day manifest cannot satisfy the default 90-day run, and the 28-day comparison requires a manifest-proven 56-day window.
+Site KPIs use only `gsc_daily_90d.csv`; page totals and click-decline analysis use only `gsc_page_daily_90d.csv`; query detail remains limited to keyword, intent, and content-gap analysis. GSC may legitimately omit zero-data dates, so coverage is proven by the completed fetch manifest rather than consecutive CSV rows. Header-only zero-row CSVs are also valid when the complete window has no GSC data; site KPIs become zero/no data and GSC page/keyword opportunities remain empty. A stale 14-day manifest cannot satisfy the default 90-day run, and the 28-day comparison requires a manifest-proven 56-day window.
 
-`analyze_seo.py` atomically writes `seo_analysis_manifest.json`, binding both current fetch manifests to the processed and opportunity outputs. `weekly_report.py` fails closed if raw data was refreshed without rerunning analysis. For a historical run, pass the same `--start-date` and `--end-date` to all four commands.
+Each validator reads a file once as bytes, verifies the hash, and parses that same snapshot; callers do not pre-read or reread validated CSV paths. `analyze_seo.py` atomically writes `seo_analysis_manifest.json`, binding the exact GSC/GA4 manifest bytes used to the processed and opportunity outputs. `weekly_report.py` fails closed if raw data was refreshed without rerunning analysis. For a historical run, pass the same `--start-date` and `--end-date` to all four commands.
 
 ## Security Notes
 

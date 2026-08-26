@@ -4,7 +4,15 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from gsc_contract import file_sha256
+import pandas as pd
+
+from gsc_contract import (
+    bytes_sha256,
+    file_sha256,
+    parse_csv_bytes,
+    parse_json_bytes,
+    read_file_bytes,
+)
 
 
 MANIFEST_VERSION = 1
@@ -13,7 +21,7 @@ MANIFEST_VERSION = 1
 def build_analysis_manifest(
     start_date: str,
     end_date: str,
-    source_manifest_paths: dict[str, Path],
+    source_manifests: dict[str, dict[str, str]],
     artifact_paths: dict[str, Path],
 ) -> dict:
     return {
@@ -21,10 +29,7 @@ def build_analysis_manifest(
         "status": "complete",
         "completed_at": datetime.now(timezone.utc).isoformat(),
         "expected_window": {"startDate": start_date, "endDate": end_date},
-        "source_manifests": {
-            name: {"file": path.name, "sha256": file_sha256(path)}
-            for name, path in source_manifest_paths.items()
-        },
+        "source_manifests": source_manifests,
         "artifacts": {
             name: {"file": path.name, "sha256": file_sha256(path)}
             for name, path in artifact_paths.items()
@@ -47,13 +52,9 @@ def load_and_validate_analysis_artifacts(
     expected_end: str,
     source_manifest_paths: dict[str, Path],
     artifact_paths: dict[str, Path],
-) -> dict:
-    if not manifest_path.exists():
-        raise RuntimeError(f"SEO analysis manifest is missing: {manifest_path}")
-    try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as error:
-        raise RuntimeError(f"SEO analysis manifest is unreadable: {manifest_path}") from error
+) -> tuple[dict, dict[str, pd.DataFrame], dict[str, dict[str, str]]]:
+    manifest_bytes = read_file_bytes(manifest_path, "SEO analysis manifest")
+    manifest = parse_json_bytes(manifest_bytes, "SEO analysis manifest")
 
     if manifest.get("version") != MANIFEST_VERSION or manifest.get("status") != "complete":
         raise RuntimeError("SEO analysis manifest is not a completed supported manifest")
@@ -63,20 +64,27 @@ def load_and_validate_analysis_artifacts(
             f"SEO analysis manifest window mismatch: expected {expected_start}..{expected_end}"
         )
 
+    source_manifests: dict[str, dict[str, str]] = {}
     for name, path in source_manifest_paths.items():
         recorded = (manifest.get("source_manifests") or {}).get(name) or {}
         if recorded.get("file") != path.name:
             raise RuntimeError(f"SEO analysis {name} source manifest file mismatch")
-        if not path.exists() or recorded.get("sha256") != file_sha256(path):
-            raise RuntimeError(
-                f"SEO analysis is stale because the {name} source manifest changed"
-            )
+        digest = recorded.get("sha256")
+        if not isinstance(digest, str) or len(digest) != 64:
+            raise RuntimeError(f"SEO analysis {name} source manifest hash is invalid")
+        source_manifests[name] = {"file": path.name, "sha256": digest}
 
+    frames: dict[str, pd.DataFrame] = {}
     for name, path in artifact_paths.items():
         recorded = (manifest.get("artifacts") or {}).get(name) or {}
         if recorded.get("file") != path.name:
             raise RuntimeError(f"SEO analysis {name} artifact file mismatch")
-        if not path.exists() or recorded.get("sha256") != file_sha256(path):
+        contents = read_file_bytes(path, f"SEO analysis {name} artifact")
+        if recorded.get("sha256") != bytes_sha256(contents):
             raise RuntimeError(f"SEO analysis {name} artifact does not match its manifest")
+        if path.suffix.lower() == ".csv":
+            frames[name] = parse_csv_bytes(
+                contents, f"SEO analysis {name} artifact"
+            )
 
-    return manifest
+    return manifest, frames, source_manifests

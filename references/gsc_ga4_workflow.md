@@ -15,7 +15,7 @@ All three tables use these metrics:
 - `ctr`
 - `position`
 
-Do not sum the query-detail table into site or page KPIs. GSC omits anonymized queries from query-grain results, so those sums can be materially lower than Search Console's property totals. Fail closed when either daily table or its completed fetch manifest is missing, empty, or inconsistent; never substitute query detail.
+Do not sum the query-detail table into site or page KPIs. GSC omits anonymized queries from query-grain results, so those sums can be materially lower than Search Console's property totals. Fail closed when either daily table or its completed fetch manifest is missing or inconsistent; never substitute query detail. Header-only CSVs with `row_count=0` are valid when a completed request found no GSC data for the entire window.
 
 GA4 Organic Search landing page data should use:
 
@@ -50,11 +50,13 @@ Successful fetches write `gsc_fetch_manifest.json` and `ga4_fetch_manifest.json`
 - Every returned date is inside the expected window.
 - GSC site-daily and page-daily requests use the same expected window.
 
-Search Analytics may omit a calendar date when it has no data. The completed sidecar manifest proves the full date range was requested, so missing natural-day rows are valid and must not be treated as a failed fetch. Conversely, a short or stale CSV cannot prove coverage: a previous 14-day manifest must fail a current 90-day run even if its latest row looks fresh.
+Search Analytics may omit a calendar date when it has no data. The completed sidecar manifest proves the full date range was requested, so missing natural-day rows are valid and must not be treated as a failed fetch. If detail, site-daily, and page-daily all contain only headers with matching zero row counts, report site KPIs as zero/no data and leave GSC page/keyword opportunities empty. Conversely, a short or stale CSV cannot prove coverage: a previous 14-day manifest must fail a current 90-day run even if its latest row looks fresh.
 
 The recent-28-days versus prior-28-days calculation requires the manifest-proven expected window to cover at least 56 inclusive days. Anchor both periods to the expected end date, and treat omitted dates as zero only after the request contract passes.
 
-After analysis succeeds, write `data/processed/seo_analysis_manifest.json` atomically. It binds the expected window, both current fetch-manifest hashes, and the hashes of processed page/keyword/merged tables plus opportunity outputs. The weekly report must validate this manifest before reading processed data. If raw data is refreshed without rerunning analysis, fail closed rather than mixing new source totals with stale processed rows.
+Read each manifest or CSV once as bytes, verify its SHA-256, and parse the same bytes through an in-memory buffer. Do not read a CSV into a DataFrame before hashing its path, and do not reread a validated path later. This snapshot rule prevents a concurrent refresh from making validation describe different bytes from the DataFrame used in analysis.
+
+After analysis succeeds, write `data/processed/seo_analysis_manifest.json` atomically. It binds the expected window, the exact source-manifest byte hashes used by analysis, and the hashes of processed page/keyword/merged tables plus opportunity outputs. The weekly report must obtain processed DataFrames from the analysis validator's verified bytes, then require the GSC/GA4 validators to match the bound source-manifest hashes. Use the returned GA4 DataFrames for funnel comparison rather than rereading paths. If raw data is refreshed without rerunning analysis, fail closed rather than mixing new source totals with stale processed rows.
 
 ## Opportunity Logic
 

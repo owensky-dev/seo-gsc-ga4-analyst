@@ -28,14 +28,12 @@ def money(value: float) -> str:
 
 
 def organic_funnel_comparison(
-    landing_path: Path, funnel_path: Path, expected_end: str
+    landing: pd.DataFrame, funnel: pd.DataFrame, expected_end: str
 ) -> dict | None:
-    if not landing_path.exists() or not funnel_path.exists():
-        return None
-    landing = pd.read_csv(landing_path)
-    funnel = pd.read_csv(funnel_path)
     if landing.empty or "date" not in landing.columns:
         return None
+    landing = landing.copy()
+    funnel = funnel.copy()
     landing["date"] = pd.to_datetime(landing["date"], errors="coerce")
     funnel["date"] = pd.to_datetime(funnel.get("date"), errors="coerce")
     latest = pd.Timestamp(expected_end)
@@ -102,33 +100,14 @@ def main() -> None:
     merged_path = DATA_PROCESSED_DIR / "seo_merged_pages_90d.csv"
     keywords_path = DATA_PROCESSED_DIR / "gsc_keywords_90d.csv"
     opportunities_path = REPORTS_DIR / "seo_opportunities.csv"
-    gsc_path = DATA_RAW_DIR / "gsc_90d.csv"
-    gsc_daily_path = DATA_RAW_DIR / "gsc_daily_90d.csv"
-    gsc_page_daily_path = DATA_RAW_DIR / "gsc_page_daily_90d.csv"
-    gsc = pd.read_csv(gsc_path) if gsc_path.exists() else pd.DataFrame()
-    gsc_daily = pd.read_csv(gsc_daily_path) if gsc_daily_path.exists() else pd.DataFrame()
-    gsc_page_daily = (
-        pd.read_csv(gsc_page_daily_path) if gsc_page_daily_path.exists() else pd.DataFrame()
-    )
-    _, gsc_artifacts = load_and_validate_gsc_artifacts(
-        Path(args.gsc_manifest),
-        expected_start,
-        expected_end,
-        {"detail": gsc_path, "site_daily": gsc_daily_path, "page_daily": gsc_page_daily_path},
-        {"detail": gsc, "site_daily": gsc_daily, "page_daily": gsc_page_daily},
-    )
-    ga4_path = DATA_RAW_DIR / "ga4_organic_landing_pages_90d.csv"
-    ga4_funnel_path = DATA_RAW_DIR / "ga4_organic_funnel_90d.csv"
-    ga4 = pd.read_csv(ga4_path) if ga4_path.exists() else pd.DataFrame()
-    ga4_funnel = pd.read_csv(ga4_funnel_path) if ga4_funnel_path.exists() else pd.DataFrame()
-    load_and_validate_ga4_artifacts(
-        Path(args.ga4_manifest),
-        expected_start,
-        expected_end,
-        {"landing": ga4_path, "funnel": ga4_funnel_path},
-        {"landing": ga4, "funnel": ga4_funnel},
-    )
-    load_and_validate_analysis_artifacts(
+    artifact_paths = {
+        "gsc_pages": DATA_PROCESSED_DIR / "gsc_pages_90d.csv",
+        "gsc_keywords": keywords_path,
+        "seo_merged_pages": merged_path,
+        "seo_opportunities_csv": opportunities_path,
+        "seo_opportunities_md": REPORTS_DIR / "seo_opportunities.md",
+    }
+    _, analysis_frames, source_manifests = load_and_validate_analysis_artifacts(
         Path(args.analysis_manifest),
         expected_start,
         expected_end,
@@ -136,17 +115,30 @@ def main() -> None:
             "gsc": Path(args.gsc_manifest),
             "ga4": Path(args.ga4_manifest),
         },
-        {
-            "gsc_pages": DATA_PROCESSED_DIR / "gsc_pages_90d.csv",
-            "gsc_keywords": keywords_path,
-            "seo_merged_pages": merged_path,
-            "seo_opportunities_csv": opportunities_path,
-            "seo_opportunities_md": REPORTS_DIR / "seo_opportunities.md",
-        },
+        artifact_paths,
     )
-    merged = pd.read_csv(merged_path)
-    keywords = pd.read_csv(keywords_path)
-    opportunities = pd.read_csv(opportunities_path)
+    gsc_path = DATA_RAW_DIR / "gsc_90d.csv"
+    gsc_daily_path = DATA_RAW_DIR / "gsc_daily_90d.csv"
+    gsc_page_daily_path = DATA_RAW_DIR / "gsc_page_daily_90d.csv"
+    _, gsc_artifacts, _ = load_and_validate_gsc_artifacts(
+        Path(args.gsc_manifest),
+        expected_start,
+        expected_end,
+        {"detail": gsc_path, "site_daily": gsc_daily_path, "page_daily": gsc_page_daily_path},
+        source_manifests["gsc"]["sha256"],
+    )
+    ga4_path = DATA_RAW_DIR / "ga4_organic_landing_pages_90d.csv"
+    ga4_funnel_path = DATA_RAW_DIR / "ga4_organic_funnel_90d.csv"
+    _, ga4_artifacts, _ = load_and_validate_ga4_artifacts(
+        Path(args.ga4_manifest),
+        expected_start,
+        expected_end,
+        {"landing": ga4_path, "funnel": ga4_funnel_path},
+        source_manifests["ga4"]["sha256"],
+    )
+    merged = analysis_frames["seo_merged_pages"]
+    keywords = analysis_frames["gsc_keywords"]
+    opportunities = analysis_frames["seo_opportunities_csv"]
     gsc_daily = prepare_gsc_site_daily(gsc_artifacts["site_daily"])
     prepare_gsc_page_daily(gsc_artifacts["page_daily"], settings["SITE_BASE_URL"])
     gsc_summary = summarize_gsc_site(gsc_daily)
@@ -160,8 +152,8 @@ def main() -> None:
     revenue = merged["totalRevenue"].sum()
     window_days = (pd.Timestamp(expected_end) - pd.Timestamp(expected_start)).days + 1
     funnel = organic_funnel_comparison(
-        ga4_path,
-        ga4_funnel_path,
+        ga4_artifacts["landing"],
+        ga4_artifacts["funnel"],
         expected_end,
     )
 
@@ -181,6 +173,7 @@ def main() -> None:
         "## 1. Organic Search 总览",
         "",
         f"- 数据窗口: {expected_start} 至 {expected_end}（{window_days}天）",
+        f"- GSC 数据状态: {'无数据（完整请求返回 0 行）' if gsc_daily.empty else '有数据'}",
         f"- Clicks: {clicks:,.0f}",
         f"- Impressions: {impressions:,.0f}",
         f"- CTR: {ctr:.2%}",

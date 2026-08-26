@@ -160,11 +160,6 @@ def main() -> None:
         dimensions=PAGE_DAILY_DIMENSIONS,
         aggregation_type="byPage",
     )
-    if not daily_rows:
-        raise RuntimeError("GSC site-level daily query returned no rows")
-    if not page_daily_rows:
-        raise RuntimeError("GSC page-level daily query returned no rows")
-
     output_path = Path(args.out)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows, columns=DETAIL_COLUMNS).to_csv(output_path, index=False)

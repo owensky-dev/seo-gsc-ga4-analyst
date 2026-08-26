@@ -3,12 +3,14 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 
 import pandas as pd
 
 
 MANIFEST_VERSION = 1
+METRIC_COLUMNS = ["clicks", "impressions", "ctr", "position"]
 STREAM_SPECS = {
     "detail": {
         "default_file": "gsc_90d.csv",
@@ -51,6 +53,34 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def bytes_sha256(contents: bytes) -> str:
+    return hashlib.sha256(contents).hexdigest()
+
+
+def read_file_bytes(path: Path, label: str) -> bytes:
+    try:
+        return path.read_bytes()
+    except OSError as error:
+        raise RuntimeError(f"{label} is missing or unreadable: {path}") from error
+
+
+def parse_json_bytes(contents: bytes, label: str) -> dict:
+    try:
+        payload = json.loads(contents)
+    except (json.JSONDecodeError, UnicodeDecodeError) as error:
+        raise RuntimeError(f"{label} is not valid JSON") from error
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"{label} is not a JSON object")
+    return payload
+
+
+def parse_csv_bytes(contents: bytes, label: str) -> pd.DataFrame:
+    try:
+        return pd.read_csv(BytesIO(contents))
+    except (pd.errors.EmptyDataError, pd.errors.ParserError, UnicodeDecodeError) as error:
+        raise RuntimeError(f"{label} is not a readable CSV") from error
+
+
 def build_gsc_manifest(
     start_date: str,
     end_date: str,
@@ -88,14 +118,13 @@ def load_and_validate_gsc_artifacts(
     expected_start: str,
     expected_end: str,
     stream_paths: dict[str, Path],
-    frames: dict[str, pd.DataFrame],
-) -> tuple[dict, dict[str, pd.DataFrame]]:
-    if not manifest_path.exists():
-        raise RuntimeError(f"GSC fetch manifest is missing: {manifest_path}")
-    try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as error:
-        raise RuntimeError(f"GSC fetch manifest is unreadable: {manifest_path}") from error
+    expected_manifest_sha256: str | None = None,
+) -> tuple[dict, dict[str, pd.DataFrame], str]:
+    manifest_bytes = read_file_bytes(manifest_path, "GSC fetch manifest")
+    manifest_sha256 = bytes_sha256(manifest_bytes)
+    if expected_manifest_sha256 and manifest_sha256 != expected_manifest_sha256:
+        raise RuntimeError("GSC fetch manifest changed after SEO analysis")
+    manifest = parse_json_bytes(manifest_bytes, "GSC fetch manifest")
 
     if manifest.get("version") != MANIFEST_VERSION or manifest.get("status") != "complete":
         raise RuntimeError("GSC fetch manifest is not a completed supported manifest")
@@ -109,7 +138,6 @@ def load_and_validate_gsc_artifacts(
     prepared: dict[str, pd.DataFrame] = {}
     for stream_name, spec in STREAM_SPECS.items():
         path = stream_paths[stream_name]
-        frame = frames[stream_name]
         stream = manifest_streams.get(stream_name) or {}
         request = stream.get("request") or {}
         row_limit = request.get("rowLimit")
@@ -119,30 +147,33 @@ def load_and_validate_gsc_artifacts(
             raise RuntimeError(f"GSC {stream_name} manifest request contract mismatch")
         if stream.get("file") != path.name:
             raise RuntimeError(f"GSC {stream_name} manifest file mismatch")
-        if not path.exists() or stream.get("sha256") != file_sha256(path):
+        contents = read_file_bytes(path, f"GSC {stream_name} CSV")
+        if stream.get("sha256") != bytes_sha256(contents):
             raise RuntimeError(f"GSC {stream_name} file does not match its manifest")
+        frame = parse_csv_bytes(contents, f"GSC {stream_name} CSV")
         if stream.get("row_count") != len(frame):
             raise RuntimeError(f"GSC {stream_name} row count does not match its manifest")
-        if stream_name != "detail" and frame.empty:
-            raise RuntimeError(f"GSC {stream_name} CSV is empty")
-        if not frame.empty and "date" not in frame.columns:
-            raise RuntimeError(f"GSC {stream_name} CSV is missing date")
+        required_columns = set(spec["dimensions"] + METRIC_COLUMNS)
+        missing_columns = required_columns - set(frame.columns)
+        if missing_columns:
+            raise RuntimeError(
+                f"GSC {stream_name} CSV is missing columns: {sorted(missing_columns)}"
+            )
 
         current = frame.copy()
-        if not current.empty:
-            current["date"] = pd.to_datetime(current["date"], errors="coerce").dt.normalize()
-            if current["date"].isna().any():
-                raise RuntimeError(f"GSC {stream_name} CSV contains invalid dates")
-            start = pd.Timestamp(expected_start)
-            end = pd.Timestamp(expected_end)
-            outside = ~current["date"].between(start, end)
-            if outside.any():
-                raise RuntimeError(
-                    f"GSC {stream_name} CSV contains dates outside {expected_start}..{expected_end}"
-                )
+        current["date"] = pd.to_datetime(current["date"], errors="coerce").dt.normalize()
+        if current["date"].isna().any():
+            raise RuntimeError(f"GSC {stream_name} CSV contains invalid dates")
+        outside = ~current["date"].between(
+            pd.Timestamp(expected_start), pd.Timestamp(expected_end)
+        )
+        if outside.any():
+            raise RuntimeError(
+                f"GSC {stream_name} CSV contains dates outside {expected_start}..{expected_end}"
+            )
         prepared[stream_name] = current
 
-    return manifest, prepared
+    return manifest, prepared, manifest_sha256
 
 
 def validate_comparison_window(

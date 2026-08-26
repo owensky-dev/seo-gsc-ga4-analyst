@@ -116,9 +116,9 @@ reports/seo_opportunities.csv
 reports/seo_weekly_report.md
 ```
 
-GSC 会合法省略零数据日期，因此不要求 CSV 每个自然日都有一行。分析会校验 fetch manifest 已完整请求同一预期窗口，且返回日期、文件哈希和请求口径一致；旧 14 天文件不能通过默认 90 天验收。最近 28 天与前 28 天对比要求 manifest 证明至少覆盖完整 56 天，缺失的零数据日才按 0 计算。
+GSC 会合法省略零数据日期，因此不要求 CSV 每个自然日都有一行；整窗无数据时，三份带表头的零行 CSV 也是合法完成态，此时站点 KPI 显示 0 / 无数据，GSC 页面与关键词机会为空。分析会校验 fetch manifest 已完整请求同一预期窗口，且返回日期、文件哈希和请求口径一致；旧 14 天文件不能通过默认 90 天验收。最近 28 天与前 28 天对比要求 manifest 证明至少覆盖完整 56 天，缺失的零数据日才按 0 计算。
 
-`analyze_seo.py` 成功后会原子写入 `seo_analysis_manifest.json`，绑定本次 GSC/GA4 manifest 与 processed/机会文件。若只刷新 raw 而未重新分析，`weekly_report.py` 会停止，避免新 raw 与旧 processed 混用。显式历史周期请给四个命令传入相同的 `--start-date` 和 `--end-date`。
+校验器会一次读取每个文件的 bytes，并对同一份 bytes 完成哈希校验与解析；调用方不会在校验前预读或在校验后二读路径，避免并发刷新造成“校验新文件、使用旧 DataFrame”。`analyze_seo.py` 成功后会原子写入 `seo_analysis_manifest.json`，绑定本次实际读取的 GSC/GA4 manifest 与 processed/机会文件。若只刷新 raw 而未重新分析，`weekly_report.py` 会停止，避免新 raw 与旧 processed 混用。显式历史周期请给四个命令传入相同的 `--start-date` 和 `--end-date`。
 
 周报应优先回答这些实际问题：
 

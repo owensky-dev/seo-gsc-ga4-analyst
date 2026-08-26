@@ -13,13 +13,20 @@ import pandas as pd
 TEMPLATE_SCRIPTS = Path(__file__).resolve().parents[1] / "assets" / "project-template" / "scripts"
 sys.path.insert(0, str(TEMPLATE_SCRIPTS))
 
-from analyze_seo import build_aggregates, click_drop_opportunities, summarize_gsc_site
+from analyze_seo import (
+    build_aggregates,
+    build_opportunities,
+    click_drop_opportunities,
+    prepare_gsc_page_daily,
+    summarize_gsc_site,
+)
 from fetch_gsc import (
     DETAIL_DIMENSIONS,
     PAGE_DAILY_DIMENSIONS,
     SITE_DAILY_DIMENSIONS,
     build_search_analytics_body,
     fetch_gsc_rows,
+    main as fetch_gsc_main,
 )
 from gsc_contract import (
     build_gsc_manifest,
@@ -37,8 +44,10 @@ def write_gsc_artifacts(
     site_dates: list[str] | None = None,
     page_dates: list[str] | None = None,
 ) -> tuple[Path, dict[str, Path], dict[str, pd.DataFrame]]:
-    site_dates = site_dates or [start_date, end_date]
-    page_dates = page_dates or [start_date, end_date]
+    if site_dates is None:
+        site_dates = [start_date, end_date]
+    if page_dates is None:
+        page_dates = [start_date, end_date]
     frames = {
         "detail": pd.DataFrame(
             [
@@ -53,7 +62,18 @@ def write_gsc_artifacts(
                     "ctr": 0.06,
                     "position": 8,
                 }
-            ]
+            ],
+            columns=[
+                "date",
+                "page",
+                "query",
+                "country",
+                "device",
+                "clicks",
+                "impressions",
+                "ctr",
+                "position",
+            ],
         ),
         "site_daily": pd.DataFrame(
             [
@@ -65,7 +85,8 @@ def write_gsc_artifacts(
                     "position": 10,
                 }
                 for value in site_dates
-            ]
+            ],
+            columns=["date", "clicks", "impressions", "ctr", "position"],
         ),
         "page_daily": pd.DataFrame(
             [
@@ -78,7 +99,8 @@ def write_gsc_artifacts(
                     "position": 10,
                 }
                 for value in page_dates
-            ]
+            ],
+            columns=["date", "page", "clicks", "impressions", "ctr", "position"],
         ),
     }
     paths = {
@@ -186,13 +208,13 @@ class GscGrainTests(unittest.TestCase):
         self.assertEqual(summary["impressions"], 4854)
         self.assertAlmostEqual(summary["ctr"], 44 / 4854)
 
-    def test_site_daily_empty_fails_closed(self) -> None:
-        with self.assertRaisesRegex(RuntimeError, "empty or missing"):
+    def test_site_daily_without_contract_headers_fails_closed(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "missing columns"):
             summarize_gsc_site(pd.DataFrame())
 
     def test_old_fourteen_day_manifest_cannot_satisfy_ninety_day_window(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            manifest_path, paths, frames = write_gsc_artifacts(
+            manifest_path, paths, _ = write_gsc_artifacts(
                 Path(directory), "2026-08-02", "2026-08-15"
             )
             with self.assertRaisesRegex(RuntimeError, "window mismatch"):
@@ -201,12 +223,11 @@ class GscGrainTests(unittest.TestCase):
                     "2026-05-18",
                     "2026-08-15",
                     paths,
-                    frames,
                 )
 
     def test_stale_ninety_day_manifest_cannot_satisfy_current_window(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            manifest_path, paths, frames = write_gsc_artifacts(
+            manifest_path, paths, _ = write_gsc_artifacts(
                 Path(directory), "2026-05-17", "2026-08-14"
             )
             with self.assertRaisesRegex(RuntimeError, "window mismatch"):
@@ -215,32 +236,155 @@ class GscGrainTests(unittest.TestCase):
                     "2026-05-18",
                     "2026-08-15",
                     paths,
-                    frames,
                 )
 
     def test_complete_manifest_allows_legitimate_no_data_days(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            manifest_path, paths, frames = write_gsc_artifacts(
+            manifest_path, paths, _ = write_gsc_artifacts(
                 Path(directory),
                 "2026-05-18",
                 "2026-08-15",
                 site_dates=["2026-05-18", "2026-06-20", "2026-08-15"],
                 page_dates=["2026-05-18", "2026-07-20", "2026-08-15"],
             )
-            _, prepared = load_and_validate_gsc_artifacts(
+            _, prepared, _ = load_and_validate_gsc_artifacts(
                 manifest_path,
                 "2026-05-18",
                 "2026-08-15",
                 paths,
-                frames,
             )
 
         self.assertEqual(len(prepared["site_daily"]), 3)
         self.assertEqual(len(prepared["page_daily"]), 3)
 
+    def test_complete_manifest_allows_an_entirely_empty_gsc_window(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = {
+                "detail": root / "gsc_90d.csv",
+                "site_daily": root / "gsc_daily_90d.csv",
+                "page_daily": root / "gsc_page_daily_90d.csv",
+            }
+            manifest_path = root / "gsc_fetch_manifest.json"
+            argv = [
+                "fetch_gsc.py",
+                "--start-date",
+                "2026-05-18",
+                "--end-date",
+                "2026-08-15",
+                "--out",
+                str(paths["detail"]),
+                "--daily-out",
+                str(paths["site_daily"]),
+                "--page-daily-out",
+                str(paths["page_daily"]),
+                "--manifest-out",
+                str(manifest_path),
+            ]
+            with patch(
+                "fetch_gsc.load_settings",
+                return_value={
+                    "GOOGLE_APPLICATION_CREDENTIALS": "unused.json",
+                    "GSC_SITE_URL": "sc-domain:example.com",
+                },
+            ), patch("fetch_gsc.ensure_dirs"), patch(
+                "fetch_gsc.fetch_gsc_rows", return_value=[]
+            ) as fetch_mock, patch("builtins.print"), patch.object(sys, "argv", argv):
+                fetch_gsc_main()
+            _, prepared, _ = load_and_validate_gsc_artifacts(
+                manifest_path,
+                "2026-05-18",
+                "2026-08-15",
+                paths,
+            )
+
+        self.assertEqual(fetch_mock.call_count, 3)
+        summary = summarize_gsc_site(prepared["site_daily"])
+        self.assertEqual(
+            summary,
+            {"clicks": 0.0, "impressions": 0.0, "ctr": 0.0, "position": 0.0},
+        )
+        detail = prepared["detail"].copy()
+        detail["page_url"] = pd.Series(dtype="object")
+        page_daily = prepare_gsc_page_daily(
+            prepared["page_daily"], "https://example.com/"
+        )
+        ga4 = pd.DataFrame(
+            [
+                {
+                    "landing_page_url": "https://example.com/p",
+                    "sessions": 10,
+                    "engagedSessions": 8,
+                    "conversions": 1,
+                    "totalRevenue": 100,
+                }
+            ]
+        )
+        pages, keywords, merged = build_aggregates(
+            detail, page_daily, ga4, pd.DataFrame()
+        )
+        self.assertTrue(pages.empty)
+        self.assertTrue(keywords.empty)
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(
+            click_drop_opportunities(
+                page_daily, merged, "2026-05-18", "2026-08-15"
+            ),
+            [],
+        )
+        self.assertEqual(
+            build_opportunities(
+                page_daily,
+                keywords,
+                merged,
+                0.0,
+                "2026-05-18",
+                "2026-08-15",
+            ),
+            [],
+        )
+
+    def test_gsc_validator_hashes_and_parses_the_same_file_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            manifest_path, paths, _ = write_gsc_artifacts(
+                Path(directory), "2026-05-18", "2026-08-15"
+            )
+            original_read_bytes = Path.read_bytes
+            replaced = False
+
+            def racing_read_bytes(path: Path) -> bytes:
+                nonlocal replaced
+                contents = original_read_bytes(path)
+                if path == paths["site_daily"] and not replaced:
+                    replaced = True
+                    pd.DataFrame(
+                        [
+                            {
+                                "date": "2026-08-15",
+                                "clicks": 999,
+                                "impressions": 1000,
+                                "ctr": 0.999,
+                                "position": 1,
+                            }
+                        ]
+                    ).to_csv(path, index=False)
+                return contents
+
+            with patch.object(Path, "read_bytes", racing_read_bytes):
+                _, prepared, _ = load_and_validate_gsc_artifacts(
+                    manifest_path,
+                    "2026-05-18",
+                    "2026-08-15",
+                    paths,
+                )
+
+            self.assertTrue(replaced)
+            self.assertEqual(prepared["site_daily"]["clicks"].sum(), 44)
+            self.assertEqual(pd.read_csv(paths["site_daily"])["clicks"].sum(), 999)
+
     def test_page_date_outside_shared_window_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            manifest_path, paths, frames = write_gsc_artifacts(
+            manifest_path, paths, _ = write_gsc_artifacts(
                 Path(directory),
                 "2026-05-18",
                 "2026-08-15",
@@ -252,13 +396,12 @@ class GscGrainTests(unittest.TestCase):
                     "2026-05-18",
                     "2026-08-15",
                     paths,
-                    frames,
                 )
 
     def test_page_manifest_request_must_match_site_window_contract(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            manifest_path, paths, frames = write_gsc_artifacts(
+            manifest_path, paths, _ = write_gsc_artifacts(
                 root, "2026-05-18", "2026-08-15"
             )
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -271,7 +414,6 @@ class GscGrainTests(unittest.TestCase):
                     "2026-05-18",
                     "2026-08-15",
                     paths,
-                    frames,
                 )
 
     def test_click_drop_uses_full_fifty_six_days_and_zero_fills_no_data_days(self) -> None:

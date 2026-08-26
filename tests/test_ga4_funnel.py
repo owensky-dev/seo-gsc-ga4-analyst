@@ -46,21 +46,17 @@ class OrganicFunnelTests(unittest.TestCase):
         )
 
     def test_weekly_funnel_uses_dated_rows(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            dates = pd.date_range("2026-06-24", periods=14, freq="D")
-            pd.DataFrame({"date": dates, "sessions": [10] * 14}).to_csv(root / "landing.csv", index=False)
-            pd.DataFrame(
-                [
-                    {"date": "2026-06-25", "eventName": "add_to_cart", "eventCount": 2},
-                    {"date": "2026-06-26", "eventName": "begin_checkout", "eventCount": 1},
-                    {"date": "2026-07-05", "eventName": "add_to_cart", "eventCount": 4},
-                    {"date": "2026-07-06", "eventName": "begin_checkout", "eventCount": 3},
-                ]
-            ).to_csv(root / "funnel.csv", index=False)
-            result = organic_funnel_comparison(
-                root / "landing.csv", root / "funnel.csv", "2026-07-07"
-            )
+        dates = pd.date_range("2026-06-24", periods=14, freq="D")
+        landing = pd.DataFrame({"date": dates, "sessions": [10] * 14})
+        funnel = pd.DataFrame(
+            [
+                {"date": "2026-06-25", "eventName": "add_to_cart", "eventCount": 2},
+                {"date": "2026-06-26", "eventName": "begin_checkout", "eventCount": 1},
+                {"date": "2026-07-05", "eventName": "add_to_cart", "eventCount": 4},
+                {"date": "2026-07-06", "eventName": "begin_checkout", "eventCount": 3},
+            ]
+        )
+        result = organic_funnel_comparison(landing, funnel, "2026-07-07")
         self.assertIsNotNone(result)
         self.assertEqual(result["current"]["add_to_cart"], 4)
         self.assertEqual(result["current"]["begin_checkout"], 3)
@@ -98,7 +94,6 @@ class OrganicFunnelTests(unittest.TestCase):
                     "2026-05-19",
                     "2026-08-16",
                     paths,
-                    frames,
                 )
 
     def test_page_aggregates_include_funnel_events(self) -> None:

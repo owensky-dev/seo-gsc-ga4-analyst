@@ -64,9 +64,9 @@ Use one shared expected window for GSC, GA4, analysis, and the weekly report. Th
 - `reports/seo_opportunities.csv`
 - `reports/seo_weekly_report.md`
 
-Treat the two GSC daily tables and both fetch manifests as required inputs. GSC may omit dates with zero data, so do not require one row per calendar day. Instead, require completed manifests whose exact request window and parameters match the shared expected window, whose file hashes and row counts match, and whose returned dates stay inside that window. The site and page daily streams must share the same contract; never fall back to query detail.
+Treat the two GSC daily tables and both fetch manifests as required inputs. GSC may omit dates with zero data, so do not require one row per calendar day. A completed request may also produce header-only detail, site, and page CSVs for an entirely zero-data window; report site KPIs as zero/no data and return no GSC page or keyword opportunities. Require completed manifests whose exact request window and parameters match the shared expected window, whose file hashes and row counts match, and whose returned dates stay inside that window. The site and page daily streams must share the same contract; never fall back to query detail.
 
-The 28-day click-decline comparison requires a manifest-proven window of at least 56 days. Treat omitted dates as zero only after that request contract passes. `weekly_report.py` must also validate `seo_analysis_manifest.json`; if a fetch manifest or bound processed artifact changed after analysis, stop and rerun `analyze_seo.py` before writing the weekly report.
+Validators must read each manifest or CSV into bytes once, verify the hash, and parse that same byte snapshot. Calling code must not pre-read or reread validated CSV paths. The 28-day click-decline comparison requires a manifest-proven window of at least 56 days. Treat omitted dates as zero only after that request contract passes. `weekly_report.py` must also validate `seo_analysis_manifest.json`; if a fetch manifest or bound processed artifact changed after analysis, stop and rerun `analyze_seo.py` before writing the weekly report.
 
 ## Diagnosis Standards
 
