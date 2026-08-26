@@ -10,8 +10,9 @@ It helps Codex scaffold a Python project, fetch GSC and GA4 Organic Search data,
 
 ## What It Does
 
-- Fetches 90-day Google Search Console search performance data.
+- Fetches separate 90-day GSC property-daily, page-daily, and query-detail tables so anonymized queries do not understate KPIs.
 - Fetches 90-day GA4 Organic Search landing page data.
+- Uses one shared 90-day GSC/GA4 window ending three days ago and validates request contracts, file hashes, and returned dates with sidecar manifests.
 - Fetches date-level Organic Search `add_to_cart` and `begin_checkout` events in a separate GA4 query.
 - Joins GSC pages and GA4 landing pages with normalized URLs.
 - Identifies high-impact SEO opportunities:
@@ -35,7 +36,10 @@ assets/project-template/
   .gitignore
   requirements.txt
   scripts/
+    analysis_contract.py
     config.py
+    ga4_contract.py
+    gsc_contract.py
     fetch_gsc.py
     fetch_ga4.py
     analyze_seo.py
@@ -90,15 +94,24 @@ python3 -m venv .venv
 
 ```text
 data/raw/gsc_90d.csv
+data/raw/gsc_daily_90d.csv
+data/raw/gsc_page_daily_90d.csv
+data/raw/gsc_fetch_manifest.json
 data/raw/ga4_organic_landing_pages_90d.csv
 data/raw/ga4_organic_funnel_90d.csv
+data/raw/ga4_fetch_manifest.json
 data/processed/gsc_pages_90d.csv
 data/processed/gsc_keywords_90d.csv
 data/processed/seo_merged_pages_90d.csv
+data/processed/seo_analysis_manifest.json
 reports/seo_opportunities.md
 reports/seo_opportunities.csv
 reports/seo_weekly_report.md
 ```
+
+Site KPIs use only `gsc_daily_90d.csv`; page totals and click-decline analysis use only `gsc_page_daily_90d.csv`; query detail remains limited to keyword, intent, and content-gap analysis. GSC may legitimately omit zero-data dates, so coverage is proven by the completed fetch manifest rather than consecutive CSV rows. Header-only zero-row CSVs are also valid when the complete window has no GSC data; site KPIs become zero/no data and GSC page/keyword opportunities remain empty. A stale 14-day manifest cannot satisfy the default 90-day run, and the 28-day comparison requires a manifest-proven 56-day window.
+
+Each validator reads a file once as bytes, verifies the hash, and parses that same snapshot; callers do not pre-read or reread validated CSV paths. `analyze_seo.py` atomically writes `seo_analysis_manifest.json`, binding the exact GSC/GA4 manifest bytes used to the processed and opportunity outputs. `weekly_report.py` fails closed if raw data was refreshed without rerunning analysis. For a historical run, pass the same `--start-date` and `--end-date` to all four commands.
 
 ## Security Notes
 

@@ -47,6 +47,18 @@ def default_date_range(days: int = 90) -> tuple[str, str]:
     return start.isoformat(), end.isoformat()
 
 
+def default_gsc_date_range(
+    days: int = 90, finalized_lag_days: int = 3
+) -> tuple[str, str]:
+    if days < 1:
+        raise ValueError("days must be at least 1")
+    if finalized_lag_days < 1:
+        raise ValueError("finalized_lag_days must be at least 1")
+    end = date.today() - timedelta(days=finalized_lag_days)
+    start = end - timedelta(days=days - 1)
+    return start.isoformat(), end.isoformat()
+
+
 def normalize_url(value: str, site_url: str) -> str:
     if not isinstance(value, str):
         return ""
