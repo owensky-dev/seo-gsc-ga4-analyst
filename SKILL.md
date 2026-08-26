@@ -41,11 +41,15 @@ python3 -m venv .venv
 
 The GA4 fetch must keep landing-page Sessions and ecommerce events in separate requests. Preserve `date` on the Organic landing-page rows, and fetch `add_to_cart` plus `begin_checkout` using `date`, `landingPagePlusQueryString`, and `eventName` with `eventCount`.
 
+The GSC fetch must keep three grains in separate requests: `date` with `aggregationType=byProperty` for site KPIs, `date,page` with `aggregationType=byPage` for page totals and decline analysis, and `date,page,query,country,device` for query/intent detail. Use `type=web` for all three. Never sum query detail into site or page KPIs because anonymized queries make that detail non-additive.
+
 4. When network access is restricted, retry API fetch commands with the appropriate approval path. Explain that GSC/GA4 calls require outbound network access.
 
 5. Validate outputs before reporting success:
 
 - `data/raw/gsc_90d.csv`
+- `data/raw/gsc_daily_90d.csv`
+- `data/raw/gsc_page_daily_90d.csv`
 - `data/raw/ga4_organic_landing_pages_90d.csv`
 - `data/raw/ga4_organic_funnel_90d.csv`
 - `data/processed/gsc_pages_90d.csv`
@@ -54,6 +58,8 @@ The GA4 fetch must keep landing-page Sessions and ecommerce events in separate r
 - `reports/seo_opportunities.md`
 - `reports/seo_opportunities.csv`
 - `reports/seo_weekly_report.md`
+
+Treat the two GSC daily tables as required inputs. If either is missing, empty, or lacks the latest 14 consecutive days, stop instead of falling back to query detail.
 
 ## Diagnosis Standards
 

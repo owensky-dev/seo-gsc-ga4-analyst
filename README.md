@@ -10,7 +10,7 @@
 
 ## 能解决什么问题
 
-- 拉取近 90 天 GSC 的关键词、页面、点击、展示、CTR 和平均排名数据。
+- 分别拉取近 90 天 GSC 站点日汇总、页面日汇总和查询明细，避免匿名查询导致总量被低估。
 - 拉取近 90 天 GA4 Organic Search 落地页、Sessions、转化与收入数据。
 - 单独保留按日期的 `add_to_cart` 和 `begin_checkout` 漏斗数据，避免用汇总数字掩盖漏斗变化。
 - 按标准化 URL 合并 GSC 页面与 GA4 落地页，判断问题在搜索端还是页面承接端。
@@ -100,6 +100,8 @@ python3 -m venv .venv
 
 ```text
 data/raw/gsc_90d.csv
+data/raw/gsc_daily_90d.csv
+data/raw/gsc_page_daily_90d.csv
 data/raw/ga4_organic_landing_pages_90d.csv
 data/raw/ga4_organic_funnel_90d.csv
 data/processed/gsc_pages_90d.csv
@@ -150,6 +152,7 @@ reports/seo_weekly_report.md
 ## 常见排查
 
 - **GSC 返回 403 或无数据：** 确认服务账号已被加入 Search Console，且 `GSC_SITE_URL` 与已验证资源完全一致。仅在同时拥有两个资源时，再尝试 `https://example.com/` 与 `sc-domain:example.com` 两种格式。
+- **GSC 明细合计小于后台总量：** 查询维度会排除匿名查询。站点 KPI 只读取 `gsc_daily_90d.csv`，页面指标只读取 `gsc_page_daily_90d.csv`；缺失时停止，不用查询明细回填。
 - **GA4 权限错误：** 将服务账号邮箱加入对应 GA4 Property，授予 Viewer 或 Analyst 权限。
 - **GA4 收入为 0：** 这可能是电商事件埋点或归因设置问题，不必然代表 SEO 没有价值。
 - **GA4 落地页为 `(not set)`：** 应将其单独处理或过滤，以保留可执行的页面级建议。

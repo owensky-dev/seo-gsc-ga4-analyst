@@ -2,20 +2,20 @@
 
 ## Data Model
 
-GSC raw data should use these dimensions:
+Keep three GSC raw tables because Search Analytics grains are not additive:
 
-- `date`
-- `page`
-- `query`
-- `country`
-- `device`
+- `gsc_daily_90d.csv`: `date`, `type=web`, `aggregationType=byProperty`. This is the only source for site clicks, impressions, CTR, weighted position, coverage, and daily trend.
+- `gsc_page_daily_90d.csv`: `date,page`, `type=web`, `aggregationType=byPage`. Use it for page totals, page opportunity scoring, and recent-vs-prior click decline.
+- `gsc_90d.csv`: `date,page,query,country,device`, `type=web`. Use it only for query/page mapping, keyword opportunities, intent, themes, and content gaps.
 
-GSC metrics:
+All three tables use these metrics:
 
 - `clicks`
 - `impressions`
 - `ctr`
 - `position`
+
+Do not sum the query-detail table into site or page KPIs. GSC omits anonymized queries from query-grain results, so those sums can be materially lower than Search Console's property totals. Fail closed when either daily table is missing, empty, or does not cover the latest 14 consecutive available days; never substitute query detail.
 
 GA4 Organic Search landing page data should use:
 
@@ -81,6 +81,8 @@ Use this structure for advanced reports:
 8. P0/P1/P2 execution plan.
 9. Measurement plan for the next 14 and 28 days.
 10. Caveats: date range, API filters, missing data, attribution limitations.
+
+GA4 Organic conversions and revenue are attribution/tracking signals in this two-source workflow; they are not reconciled Shopify order truth. GSC and GA4 also retain their source-native calendar dates, so call out date-boundary differences when comparing daily series.
 
 ## Execution Recommendations
 

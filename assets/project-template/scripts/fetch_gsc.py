@@ -11,7 +11,10 @@ from config import DATA_RAW_DIR, default_date_range, ensure_dirs, load_settings
 
 
 SCOPES = ["https://www.googleapis.com/auth/webmasters.readonly"]
-COLUMNS = [
+DETAIL_DIMENSIONS = ["date", "page", "query", "country", "device"]
+SITE_DAILY_DIMENSIONS = ["date"]
+PAGE_DAILY_DIMENSIONS = ["date", "page"]
+DETAIL_COLUMNS = [
     "date",
     "page",
     "query",
@@ -22,6 +25,29 @@ COLUMNS = [
     "ctr",
     "position",
 ]
+SITE_DAILY_COLUMNS = ["date", "clicks", "impressions", "ctr", "position"]
+PAGE_DAILY_COLUMNS = ["date", "page", "clicks", "impressions", "ctr", "position"]
+
+
+def build_search_analytics_body(
+    start_date: str,
+    end_date: str,
+    dimensions: list[str],
+    row_limit: int,
+    start_row: int,
+    aggregation_type: str | None = None,
+) -> dict:
+    body = {
+        "startDate": start_date,
+        "endDate": end_date,
+        "dimensions": dimensions,
+        "type": "web",
+        "rowLimit": row_limit,
+        "startRow": start_row,
+    }
+    if aggregation_type:
+        body["aggregationType"] = aggregation_type
+    return body
 
 
 def fetch_gsc_rows(
@@ -30,6 +56,8 @@ def fetch_gsc_rows(
     start_date: str,
     end_date: str,
     row_limit: int = 25000,
+    dimensions: list[str] | None = None,
+    aggregation_type: str | None = None,
 ) -> list[dict]:
     credentials = service_account.Credentials.from_service_account_file(
         key_file,
@@ -39,16 +67,17 @@ def fetch_gsc_rows(
 
     rows: list[dict] = []
     start_row = 0
-    dimensions = ["date", "page", "query", "country", "device"]
+    dimensions = dimensions or DETAIL_DIMENSIONS
 
     while True:
-        body = {
-            "startDate": start_date,
-            "endDate": end_date,
-            "dimensions": dimensions,
-            "rowLimit": row_limit,
-            "startRow": start_row,
-        }
+        body = build_search_analytics_body(
+            start_date,
+            end_date,
+            dimensions,
+            row_limit,
+            start_row,
+            aggregation_type,
+        )
         response = (
             service.searchanalytics()
             .query(siteUrl=site_url, body=body)
@@ -84,6 +113,8 @@ def main() -> None:
     parser.add_argument("--start-date")
     parser.add_argument("--end-date")
     parser.add_argument("--out", default=str(DATA_RAW_DIR / "gsc_90d.csv"))
+    parser.add_argument("--daily-out", default=str(DATA_RAW_DIR / "gsc_daily_90d.csv"))
+    parser.add_argument("--page-daily-out", default=str(DATA_RAW_DIR / "gsc_page_daily_90d.csv"))
     args = parser.parse_args()
 
     settings = load_settings()
@@ -100,12 +131,44 @@ def main() -> None:
         start_date=start_date,
         end_date=end_date,
     )
+    daily_rows = fetch_gsc_rows(
+        key_file=settings["GOOGLE_APPLICATION_CREDENTIALS"],
+        site_url=settings["GSC_SITE_URL"],
+        start_date=start_date,
+        end_date=end_date,
+        dimensions=SITE_DAILY_DIMENSIONS,
+        aggregation_type="byProperty",
+    )
+    page_daily_rows = fetch_gsc_rows(
+        key_file=settings["GOOGLE_APPLICATION_CREDENTIALS"],
+        site_url=settings["GSC_SITE_URL"],
+        start_date=start_date,
+        end_date=end_date,
+        dimensions=PAGE_DAILY_DIMENSIONS,
+        aggregation_type="byPage",
+    )
+    if not daily_rows:
+        raise RuntimeError("GSC site-level daily query returned no rows")
+    if not page_daily_rows:
+        raise RuntimeError("GSC page-level daily query returned no rows")
+
     output_path = Path(args.out)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows, columns=COLUMNS).to_csv(output_path, index=False)
-    print(f"GSC rows={len(rows)} date_range={start_date}..{end_date} out={output_path}")
+    pd.DataFrame(rows, columns=DETAIL_COLUMNS).to_csv(output_path, index=False)
+    daily_output_path = Path(args.daily_out)
+    daily_output_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(daily_rows, columns=SITE_DAILY_COLUMNS).to_csv(daily_output_path, index=False)
+    page_daily_output_path = Path(args.page_daily_out)
+    page_daily_output_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(page_daily_rows, columns=PAGE_DAILY_COLUMNS).to_csv(
+        page_daily_output_path, index=False
+    )
+    print(
+        f"GSC detail_rows={len(rows)} site_daily_rows={len(daily_rows)} "
+        f"page_daily_rows={len(page_daily_rows)} date_range={start_date}..{end_date} "
+        f"out={output_path} daily_out={daily_output_path} page_daily_out={page_daily_output_path}"
+    )
 
 
 if __name__ == "__main__":
     main()
-

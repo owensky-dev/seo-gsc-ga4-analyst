@@ -51,6 +51,9 @@ class OrganicFunnelTests(unittest.TestCase):
         gsc = pd.DataFrame(
             [{"page_url": "https://example.com/p", "query": "sink", "clicks": 2, "impressions": 20, "ctr": 0.1, "position": 4}]
         )
+        gsc_page_daily = pd.DataFrame(
+            [{"page_url": "https://example.com/p", "date": "2026-07-01", "clicks": 2, "impressions": 20, "ctr": 0.1, "position": 4}]
+        )
         ga4 = pd.DataFrame(
             [{"landing_page_url": "https://example.com/p", "sessions": 10, "engagedSessions": 8, "conversions": 1, "totalRevenue": 100}]
         )
@@ -60,7 +63,7 @@ class OrganicFunnelTests(unittest.TestCase):
                 {"landing_page_url": "https://example.com/p", "eventName": "begin_checkout", "eventCount": 2},
             ]
         )
-        _, _, merged = build_aggregates(gsc, ga4, funnel)
+        _, _, merged = build_aggregates(gsc, gsc_page_daily, ga4, funnel)
         self.assertEqual(merged.iloc[0]["add_to_cart"], 4)
         self.assertEqual(merged.iloc[0]["begin_checkout"], 2)
         self.assertEqual(merged.iloc[0]["cart_to_checkout_rate"], 0.5)

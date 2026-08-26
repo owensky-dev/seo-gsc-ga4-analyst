@@ -5,6 +5,12 @@ from pathlib import Path
 import pandas as pd
 
 from config import DATA_PROCESSED_DIR, DATA_RAW_DIR, REPORTS_DIR, ensure_dirs, load_settings
+from analyze_seo import (
+    prepare_gsc_page_daily,
+    prepare_gsc_site_daily,
+    summarize_gsc_site,
+    validate_gsc_daily_alignment,
+)
 
 
 def money(value: float) -> str:
@@ -69,15 +75,21 @@ def main() -> None:
     merged = pd.read_csv(merged_path)
     keywords = pd.read_csv(keywords_path)
     opportunities = pd.read_csv(opportunities_path)
-
-    clicks = merged["clicks"].sum()
-    impressions = merged["impressions"].sum()
-    ctr = clicks / impressions if impressions else 0
-    avg_position = (
-        (merged["position"] * merged["impressions"]).sum() / impressions
-        if impressions
-        else 0
+    gsc_daily_path = DATA_RAW_DIR / "gsc_daily_90d.csv"
+    gsc_daily = pd.read_csv(gsc_daily_path) if gsc_daily_path.exists() else pd.DataFrame()
+    gsc_daily = prepare_gsc_site_daily(gsc_daily)
+    gsc_page_daily_path = DATA_RAW_DIR / "gsc_page_daily_90d.csv"
+    gsc_page_daily = (
+        pd.read_csv(gsc_page_daily_path) if gsc_page_daily_path.exists() else pd.DataFrame()
     )
+    gsc_page_daily = prepare_gsc_page_daily(gsc_page_daily, settings["SITE_BASE_URL"])
+    validate_gsc_daily_alignment(gsc_daily, gsc_page_daily)
+    gsc_summary = summarize_gsc_site(gsc_daily)
+
+    clicks = gsc_summary["clicks"]
+    impressions = gsc_summary["impressions"]
+    ctr = gsc_summary["ctr"]
+    avg_position = gsc_summary["position"]
     sessions = merged["sessions"].sum()
     conversions = merged["conversions"].sum()
     revenue = merged["totalRevenue"].sum()

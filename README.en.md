@@ -10,7 +10,7 @@ It helps Codex scaffold a Python project, fetch GSC and GA4 Organic Search data,
 
 ## What It Does
 
-- Fetches 90-day Google Search Console search performance data.
+- Fetches separate 90-day GSC property-daily, page-daily, and query-detail tables so anonymized queries do not understate KPIs.
 - Fetches 90-day GA4 Organic Search landing page data.
 - Fetches date-level Organic Search `add_to_cart` and `begin_checkout` events in a separate GA4 query.
 - Joins GSC pages and GA4 landing pages with normalized URLs.
@@ -90,6 +90,8 @@ python3 -m venv .venv
 
 ```text
 data/raw/gsc_90d.csv
+data/raw/gsc_daily_90d.csv
+data/raw/gsc_page_daily_90d.csv
 data/raw/ga4_organic_landing_pages_90d.csv
 data/raw/ga4_organic_funnel_90d.csv
 data/processed/gsc_pages_90d.csv
@@ -99,6 +101,8 @@ reports/seo_opportunities.md
 reports/seo_opportunities.csv
 reports/seo_weekly_report.md
 ```
+
+Site KPIs use only `gsc_daily_90d.csv`; page totals and click-decline analysis use only `gsc_page_daily_90d.csv`; query detail remains limited to keyword, intent, and content-gap analysis. Missing or incomplete daily tables stop report generation instead of falling back to query-detail sums.
 
 ## Security Notes
 
