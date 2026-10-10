@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="免费 GSC 内容衰退分析：本地导入 CSV，查看 12 个月页面热力图、28 天点击下滑和排查清单。数据不上传。">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'">
+<title>内容衰退雷达 · GSC 免费分析工具</title>
+<style>:root{font-family:Inter,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;color:#172c2a;background:#f4f7f4;font-synthesis:none;--green:#175b46;--line:#dce5df}*{box-sizing:border-box}body{margin:0}header{padding:24px 5vw;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}a{color:var(--green)}.brand{text-decoration:none;font-weight:800;font-size:19px}.brand span{font-size:12px;font-weight:500;letter-spacing:1px;margin-left:12px}.badge{font-size:12px;color:#51635c}main{max-width:1420px;padding:0 5vw;margin:auto}.hero{padding:55px 0 32px}.eyebrow{font-size:11px;letter-spacing:2px;color:#597166;font-weight:700}h1{font-size:clamp(36px,4.5vw,60px);letter-spacing:-2px;line-height:1.15;margin:18px 0}h2{font-size:22px;margin:0 0 10px}h3{font-size:17px}.lead{font-size:17px;color:#56675f;line-height:1.8}.import-card,.panel{border:1px solid var(--line);border-radius:18px;background:white;padding:26px;margin-bottom:25px}.import-card{box-shadow:0 10px 35px #23493008;border-top:4px solid var(--green)}p{line-height:1.7}button,.button,select,input{font:inherit}button,.button{border:1px solid #cedad2;background:white;border-radius:8px;padding:10px 16px;color:#254638;cursor:pointer;text-decoration:none;display:inline-block;font-size:13px}button:hover,.button:hover{background:#eff5f0;border-color:#7aa88c}button:disabled{opacity:.45;cursor:default}.primary{background:var(--green);color:white;border-color:var(--green)}.primary:hover{background:#124734}input[type=file]{display:block;font-size:12px;max-width:100%}.button input[type=file]{position:absolute;width:1px;height:1px;opacity:0}.button:focus-within{outline:3px solid #99c7b2;outline-offset:3px}.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}details{margin-top:22px;font-size:13px;color:#56675f}summary{cursor:pointer;font-weight:600}.manifest-label{display:block;padding:12px;background:#f4f7f4;border-radius:8px}code{background:#edf3ef;padding:2px 5px;border-radius:4px}#message{font-size:13px;margin-bottom:0}.error{color:#a83429}.section-head{display:flex;justify-content:space-between;gap:20px;align-items:center;margin:32px 0 18px}.panel .section-head{margin:0 0 20px}.section-head p:not(.eyebrow){font-size:12px;margin:0;color:#68766e}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.stat{border:1px solid var(--line);background:white;padding:20px;border-radius:12px}.stat span{display:block;font-size:12px;color:#68766e}.stat strong{display:block;font-size:30px;margin:10px 0 6px;font-variant-numeric:tabular-nums}.stat small{font-size:11px;color:#68766e}.note{font-size:12px;color:#68766e;line-height:1.8}.filters{display:flex;gap:18px;align-items:center;margin:16px 0 20px;flex-wrap:wrap}label{font-size:12px}input[type=search],input[type=number],select{border:1px solid var(--line);border-radius:6px;padding:8px;background:white;color:#254638}input[type=search]{width:230px}input[type=number]{width:75px}.legend{margin-left:auto;font-size:11px;color:#68766e;line-height:1.7}.table-scroll{overflow-x:auto;max-height:650px;border:1px solid var(--line);border-radius:8px}table{border-collapse:separate;border-spacing:0;width:100%;font-size:12px;font-variant-numeric:tabular-nums}th{background:#f2f5f2;font-weight:600;text-align:right;white-space:nowrap;position:sticky;top:0;z-index:2;padding:12px 9px;border-bottom:1px solid var(--line)}td{padding:12px 9px;text-align:right;border-bottom:1px solid #edf1ec;white-space:nowrap}th:first-child,td:first-child{position:sticky;left:0;text-align:left;z-index:1;background:#fff;min-width:235px;max-width:300px}th:first-child{background:#f2f5f2;z-index:3}.page-button{padding:0;border:0;border-radius:0;max-width:280px;overflow:hidden;text-overflow:ellipsis;display:block;text-align:left;font-size:12px;background:none;font-weight:600;line-height:1.7}.page-button:hover{text-decoration:underline;background:none}.signal{display:block;font-size:10px;color:#758278;margin-top:3px}.loss{color:#ac4e34;font-weight:700}.gain{color:#196147}.partial{background:#f5f5f2;color:#808779;font-style:italic}.pagination{display:flex;gap:12px;align-items:center;padding-top:16px;font-size:12px}.pagination span{margin-right:auto}#detail-title{font-size:19px;word-break:break-all}#detail-compare{font-size:13px}.charts{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}.chart{border:1px solid var(--line);border-radius:10px;padding:15px}.chart h3{margin:0 0 10px}.chart svg{width:100%;height:auto;display:block}.chart p{font-size:11px;color:#728174;margin:5px 0 0}#advice{font-size:14px;padding-left:20px;line-height:2}footer{padding:30px 0 45px;margin-top:30px;color:#718176;font-size:12px;border-top:1px solid var(--line)}.sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #78b999;outline-offset:3px}[hidden]{display:none!important}@media(max-width:700px){header{align-items:flex-start;gap:14px}.brand span{display:none}.badge{max-width:140px;text-align:right;line-height:1.5}main{padding:0 18px}.hero{padding-top:35px}.import-card,.panel{padding:18px;border-radius:12px}.section-head{display:block}.section-head .actions{margin-top:14px}.stats{grid-template-columns:repeat(2,1fr)}.stat{padding:15px}.stat strong{font-size:26px}.charts{grid-template-columns:1fr}.legend{margin-left:0}th:first-child,td:first-child{min-width:190px;max-width:190px}.page-button{max-width:172px}.filters{gap:12px}input[type=search]{width:190px}}
+</style>
+</head>
+<body>
+<header><a class="brand" href="https://github.com/owensky-dev/seo-gsc-ga4-analyst" target="_blank" rel="noopener">虎皮叔叔 <span>/ SEO LAB</span></a><span class="badge">免费 · 无需登录 · 数据留在本机</span></header>
+<main>
+<section class="hero"><p class="eyebrow">GSC CONTENT DECAY RADAR</p><h1>哪些页面，<br>正在悄悄掉流量？</h1><p class="lead">把一年的搜索表现摊开看。找到值得优先处理的页面，再决定要不要重写。</p></section>
+<section class="import-card" aria-label="导入数据">
+<div><h2>从你的 GSC 数据开始</h2><p>导入「日期 × 页面」CSV。文件只在浏览器内读取，不会上传。</p></div>
+<div class="actions"><label class="button primary">选择 CSV<input id="csv-file" type="file" accept=".csv,text/csv"></label><button id="demo">先看演示</button><button id="sample">下载示例 CSV</button></div>
+<details><summary>需要什么数据？如何导出？</summary><p>必需列：<code>date,page,clicks,impressions</code>；可选：<code>ctr,position</code>。每行代表一天、一个页面。日期用 YYYY-MM-DD。最多 20 MB / 20 万行。</p><p>GSC 网页里的“页面”汇总和“日期”汇总是两张不同的表，不能拼出这张热力图。使用本开源 Skill 的 <code>fetch_content_decay.py</code>，从官方 API 按天取数；只需 GSC 只读访问，不需要 GA4。也可导入已有的同口径 CSV。</p><p>想用 Skill 自动生成报告？<a href="https://github.com/owensky-dev/seo-gsc-ga4-analyst#内容衰退雷达" target="_blank" rel="noopener">查看安装与取数步骤 ↗</a></p><label class="manifest-label">可选：同时导入本工具的 .manifest.json 采集清单 <input id="manifest-file" type="file" accept=".json,application/json"></label><p>清单验证文件和逐日采集窗口。没有清单时，未出现的日期保持未知；页面明确覆盖两个完整窗口时仍可比较。API 返回行也可能不是全量，触及上限的日期会标记不完整。</p></details>
+<p id="message" role="status" aria-live="polite">尚未导入数据。可以先用合成示例试一试。</p>
+</section>
+<section id="results" hidden>
+<div class="section-head"><div><p class="eyebrow" id="source-label"></p><h2>先看变化，再排优先级</h2></div><div class="actions"><button id="export-csv">导出分析 CSV</button><button id="export-html">保存离线报告</button><button id="clear">清除本次数据</button></div></div>
+<div id="stats" class="stats"></div>
+<p id="coverage" class="note"></p>
+<section class="panel"><div class="section-head"><div><h2>页面月度热力图</h2><p id="heat-caption">每行与这个页面自己的月均值比较，颜色不跨页面比较。</p></div><div class="actions"><label>指标 <select id="metric"><option value="clicks">点击</option><option value="impressions">展示</option></select></label><label>排序 <select id="sort"><option value="loss">28 天减少点击</option><option value="total">12 月点击总量</option></select></label></div></div>
+<div class="filters"><label>筛选页面 <input id="search" type="search" placeholder="输入 URL 中的关键词"></label><label>前 28 天点击 ≥ <input id="min-clicks" type="number" min="0" value="0" step="1"></label><span class="legend">浅 → 深：低于 → 高于自身月均值<br>— 未知　* 部分数据</span></div>
+<div class="table-scroll"><table><caption class="sr-only">页面热力图和两个 28 天窗口比较，点击页面查看详情</caption><thead id="head"></thead><tbody id="body"></tbody></table></div><div class="pagination"><span id="count"></span><button id="prev">上一页</button><button id="next">下一页</button></div></section>
+<section id="detail" class="panel" hidden><div class="section-head"><div><p class="eyebrow">PAGE INSIGHT</p><h2 id="detail-title"></h2></div><button id="close-detail">收起详情</button></div><p id="detail-compare"></p><div id="charts" class="charts"></div><h3>下一步怎么查</h3><ul id="advice"></ul><p class="note">本页未导入查询明细，不推测关键词原因；在 GSC 里筛选同一 URL 后继续按查询、设备检查。平均排名按展示量加权，CTR 按总点击 ÷ 总展示重算。</p></section>
+</section>
+<footer><p>虎皮叔叔聊跨境独立站 · 用数据找到下一步</p><p><a href="https://github.com/owensky-dev/seo-gsc-ga4-analyst" target="_blank" rel="noopener">源码与 Skill</a> · <a href="https://developers.google.com/webmaster-tools/v1/how-tos/all-your-data" target="_blank" rel="noopener">Google 数据口径</a> · 本工具没有上传接口、广告或统计追踪。导出的报告含你导入的数据，请自行保管。</p></footer>
+</main>
+<script type="application/json" id="seed">null</script>
+<script>(function (root) {
+  'use strict';
+  const DAY = 86400000;
+  const iso = d => new Date(d).toISOString().slice(0, 10);
+  function day(s) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || !Number.isFinite(Date.parse(s)) || iso(s) !== s) throw Error('日期须为有效的 YYYY-MM-DD');
+    return Date.parse(s);
+  }
+  function csvRows(text) {
+    const rows = []; let row = [], cell = '', quoted = false, closed = false;
+    text = text.replace(/^\uFEFF/, '');
+    for (let i = 0; i <= text.length; i++) {
+      const c = text[i];
+      if (quoted) {
+        if (c === undefined) throw Error('CSV 引号未闭合');
+        if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+        else if (c === '"') { quoted = false; closed = true; }
+        else cell += c;
+      } else if (c === ',' || c === '\n' || c === '\r' || c === undefined) {
+        row.push(cell); cell = ''; closed = false;
+        if (c !== ',') {
+          if (row.some(x => x !== '')) rows.push(row);
+          row = [];
+          if (c === '\r' && text[i + 1] === '\n') i++;
+        }
+      } else if (c === '"' && cell === '' && !closed) quoted = true;
+      else { if (closed || c === '"') throw Error('CSV 引号格式错误'); cell += c; }
+    }
+    return rows;
+  }
+  function parse(text) {
+    if (text.length > 20 * 1024 * 1024) throw Error('第一版支持 20 MB 内的 CSV，请先筛选页面范围');
+    const raw = csvRows(text), headers = (raw.shift() || []).map(x => x.trim().toLowerCase());
+    const allowed = ['date', 'page', 'clicks', 'impressions', 'ctr', 'position'];
+    if (new Set(headers).size !== headers.length || headers.some(x => !allowed.includes(x))) throw Error('仅接受 date,page,clicks,impressions 及可选 ctr,position 列；请勿导入查询、国家或设备明细');
+    for (const h of allowed.slice(0, 4)) if (!headers.includes(h)) throw Error('缺少 ' + h + ' 列。GSC 普通页面汇总不能还原按月趋势，请使用“日期 × 页面”导出');
+    if (raw.length > 200000) throw Error('第一版支持 20 万行内的 CSV');
+    const keys = new Set();
+    const rows = raw.map((cells, i) => {
+      if (cells.length !== headers.length) throw Error('第 ' + (i + 2) + ' 行列数不匹配');
+      const r = Object.fromEntries(headers.map((h, j) => [h, cells[j].trim()]));
+      day(r.date);
+      if (!r.page || !(r.page.startsWith('/') || /^https?:\/\//i.test(r.page))) throw Error('页面须为 HTTP(S) URL 或 / 开头的路径');
+      const key = JSON.stringify([r.date, r.page]);
+      if (keys.has(key)) throw Error('存在重复的日期 × 页面；请先去重，不能叠加不同导出');
+      keys.add(key);
+      for (const k of ['clicks', 'impressions']) {
+        if (!/^\d+(\.0+)?$/.test(r[k]) || !Number.isSafeInteger(Number(r[k]))) throw Error(k + ' 须为非负整数');
+        r[k] = Number(r[k]);
+      }
+      if (r.clicks > r.impressions) throw Error('点击不能大于展示');
+      r.position = r.position === undefined || r.position === '' ? null : Number(r.position);
+      if (r.position !== null && (!Number.isFinite(r.position) || r.position < 0 || (r.impressions > 0 && r.position < 1))) throw Error('平均排名无效');
+      r.ctr = r.impressions ? r.clicks / r.impressions : null;
+      return r;
+    });
+    return rows.sort((a, b) => a.date.localeCompare(b.date));
+  }
+  async function verify(text, manifest, filename) {
+    const rows = parse(text);
+    if (!manifest) return { rows, coverage: null };
+    if (manifest.version !== 1 || manifest.kind !== 'gsc-content-decay' || manifest.status !== 'complete') throw Error('需要本工具生成的完整采集清单；旧 GSC 三表仍可只导入页面 CSV');
+    const w = manifest.window || {}, start = day(w.start), end = day(w.end);
+    if (start > end || end - start > 500 * DAY) throw Error('清单时间窗口无效');
+    if (manifest.request?.type !== 'web' || manifest.request?.aggregationType !== 'byPage' || manifest.request?.dataState !== 'final' || JSON.stringify(manifest.request?.dimensions) !== '["date","page"]') throw Error('清单请求口径不匹配');
+    const hash = [...new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))].map(x => x.toString(16).padStart(2, '0')).join('');
+    if (manifest.sha256 !== hash || manifest.row_count !== rows.length || manifest.file !== filename) throw Error('CSV 与清单的文件名、哈希或行数不一致');
+    const counts = new Map();
+    for (const r of rows) { if (day(r.date) < start || day(r.date) > end) throw Error('CSV 日期超出清单'); counts.set(r.date, (counts.get(r.date) || 0) + 1); }
+    if (!Array.isArray(manifest.days) || manifest.days.length !== (end - start) / DAY + 1) throw Error('采集清单缺少日期');
+    const capped = [];
+    for (let i = 0; i < manifest.days.length; i++) {
+      const d = manifest.days[i];
+      if (d.date !== iso(start + i * DAY) || d.status !== 'complete' || d.rows !== (counts.get(d.date) || 0) || typeof d.capped !== 'boolean' || (d.rows >= 50000 && !d.capped)) throw Error('逐日采集记录不匹配');
+      if (d.capped) capped.push(d.date);
+    }
+    return { rows, coverage: { start: w.start, end: w.end, capped } };
+  }
+  function total(rows) {
+    const clicks = rows.reduce((s, r) => s + r.clicks, 0), impressions = rows.reduce((s, r) => s + r.impressions, 0);
+    const positions = rows.filter(r => r.impressions > 0);
+    return { clicks, impressions, ctr: impressions ? clicks / impressions : null,
+      position: impressions && positions.every(r => r.position !== null) ? positions.reduce((s, r) => s + r.position * r.impressions, 0) / impressions : null };
+  }
+  function period(rows, start, end, coverage) {
+    const selected = rows.filter(r => r.date >= start && r.date <= end), days = (day(end) - day(start)) / DAY + 1;
+    const covered = coverage && coverage.start <= start && coverage.end >= end && !coverage.capped.some(d => d >= start && d <= end);
+    const complete = !!covered || (!coverage && selected.length === days);
+    return { ...total(selected), complete, observedDays: selected.length, days };
+  }
+  function analyze(rows, coverage, now = iso(Date.now())) {
+    if (!rows.length && !coverage) throw Error('CSV 没有数据，也没有可验证的时间窗口');
+    const end = coverage?.end || rows.at(-1).date, endTime = day(end);
+    if (end >= now) throw Error('包含今天或未来日期，请使用已完成的历史数据');
+    const endDate = new Date(endTime), nextDay = new Date(endTime + DAY);
+    const monthEnd = nextDay.getUTCDate() === 1 ? new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() + 1, 1)) : new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), 1));
+    const months = Array.from({ length: 12 }, (_, i) => {
+      const y = monthEnd.getUTCFullYear(), m = monthEnd.getUTCMonth() - 12 + i;
+      const start = iso(Date.UTC(y, m, 1)), end = iso(Date.UTC(y, m + 1, 1) - DAY);
+      return { start, end, label: start.slice(0, 7) };
+    });
+    const currentStart = iso(endTime - 27 * DAY), previousEnd = iso(endTime - 28 * DAY), previousStart = iso(endTime - 55 * DAY);
+    const groups = new Map();
+    for (const r of rows) { if (!groups.has(r.page)) groups.set(r.page, []); groups.get(r.page).push(r); }
+    const pages = [...groups].map(([page, data]) => {
+      const current = period(data, currentStart, end, coverage), previous = period(data, previousStart, previousEnd, coverage);
+      const comparable = current.complete && previous.complete;
+      const loss = comparable ? previous.clicks - current.clicks : null;
+      const change = comparable && previous.clicks > 0 ? (current.clicks - previous.clicks) / previous.clicks : null;
+      const monthly = months.map(m => period(data, m.start, m.end, coverage));
+      const annual = total(data.filter(r => r.date >= months[0].start && r.date <= months[11].end));
+      let status = '待补数据';
+      if (comparable) status = previous.clicks < 30 ? '低基数 / 新增信号' : loss > 0 && change <= -0.2 ? '优先排查' : loss > 0 ? '小幅下降' : '稳定 / 增长';
+      return { page, data, monthly, annual, current, previous, comparable, loss, change, status };
+    });
+    pages.sort((a, b) => (b.loss ?? -Infinity) - (a.loss ?? -Infinity) || b.annual.clicks - a.annual.clicks || a.page.localeCompare(b.page));
+    return { months, pages, end, currentStart, previousEnd, previousStart, coverage };
+  }
+  function guidance(p) {
+    if (!p.comparable) return ['先补齐两个 28 天窗口的数据，再判断是否下滑。'];
+    const advice = [];
+    if (p.previous.clicks < 30) advice.push('前期点击不足 30，先观察实际点击规模，不按降幅百分比直接排高优先级。');
+    if (p.loss <= 0) advice.push('当前未观察到点击净下降，继续监测，不必为了更新而重写。');
+    else {
+      advice.push('先排查季节性、页面迁移和改版；这里是下滑信号，不是原因判定。');
+      if (p.current.impressions < p.previous.impressions) advice.push('展示减少：核对查询需求、收录状态、页面覆盖与关键词排名。');
+      if (p.current.ctr !== null && p.previous.ctr !== null && p.current.ctr < p.previous.ctr) advice.push('CTR 下降：核对相同查询与设备下的标题、摘要和搜索结果变化。');
+      if (p.current.position !== null && p.previous.position !== null && p.current.position > p.previous.position) advice.push('平均排名变差：进一步按查询拆分，检查竞争页面、内容时效和内链。');
+      advice.push('记录修改日期与假设，修改后用同口径窗口复查；可补充去年同期，但本工具不自动认定季节性。');
+    }
+    return advice;
+  }
+  function csvCell(value) {
+    let s = value === null || value === undefined ? '' : String(value);
+    if (/^[\s]*[=+@-]/.test(s) && typeof value !== 'number') s = "'" + s;
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  function exportCSV(model) {
+    const rows = [['page', 'previous_28d_clicks', 'current_28d_clicks', 'lost_clicks', 'change_ratio', 'status', 'comparison_end', ...model.months.flatMap(m => [m.label + '_clicks_observed', m.label + '_complete'])]];
+    for (const p of model.pages) rows.push([p.page, p.comparable ? p.previous.clicks : null, p.comparable ? p.current.clicks : null, p.loss, p.change, p.status, model.end, ...p.monthly.flatMap(m => [m.complete || m.observedDays ? m.clicks : null, m.complete])]);
+    return '\uFEFF' + rows.map(r => r.map(csvCell).join(',')).join('\r\n');
+  }
+  const api = { DAY, iso, day, csvRows, parse, verify, total, period, analyze, guidance, exportCSV };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  else root.Decay = api;
+})(globalThis);
+</script>
+<script>(() => {
+  'use strict';
+  const $ = id => document.getElementById(id), D = window.Decay;
+  const fmt = v => v === null ? '—' : Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 1 });
+  const pct = v => v === null ? '—' : (v * 100).toFixed(1) + '%';
+  let model = null, payload = null, pageIndex = 0, generation = 0;
+  function element(tag, text, cls) { const e = document.createElement(tag); if (text !== undefined) e.textContent = text; if (cls) e.className = cls; return e; }
+  function message(text, error = false) { $('message').textContent = text; $('message').className = error ? 'error' : ''; }
+  function download(name, text, type) {
+    const url = URL.createObjectURL(new Blob([text], { type }));
+    const a = element('a'); a.href = url; a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  function demoData() {
+    const now = new Date(), end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) - 3 * D.DAY);
+    const start = new Date(Date.UTC(end.getUTCFullYear() - 1, end.getUTCMonth(), 1));
+    const names = ['guides/shower-door-size', 'collections/heated-towel-racks', 'blog/bathroom-layout', 'guides/glass-care', 'products/compact-rail', 'blog/new-materials'];
+    const rows = ['date,page,clicks,impressions,position'];
+    for (let t = +start; t <= +end; t += D.DAY) for (let i = 0; i < names.length; i++) {
+      const age = Math.round((t - start) / D.DAY), recent = t > +end - 28 * D.DAY;
+      const clicks = i === 0 ? Math.max(2, 35 - Math.floor(age / 12)) : i === 1 ? (recent ? 12 : 25) : i === 2 ? 5 + Math.floor(age / 25) : i === 3 ? 8 + Math.floor(4 * Math.sin(age / 23)) : i === 4 ? (age % 4 ? 0 : 1) : age < 260 ? 0 : 4 + Math.floor((age - 260) / 20);
+      const impressions = clicks * (i === 1 && recent ? 22 : 16) + 20;
+      rows.push([D.iso(t), 'https://example.com/' + names[i], clicks, impressions, i === 0 ? (3 + age / 35).toFixed(2) : i === 1 && recent ? 11 : 7].join(','));
+    }
+    return rows.join('\n');
+  }
+  async function load(input, token = ++generation) {
+    model = null; payload = null;
+    $('results').hidden = true; $('detail').hidden = true;
+    message('正在本地校验与分析…');
+    try {
+      const { rows, coverage } = await D.verify(input.text, input.manifest, input.filename);
+      const result = D.analyze(rows, coverage);
+      if (token !== generation) return;
+      model = result; payload = input; pageIndex = 0; $('seed').textContent = 'null';
+      $('search').value = ''; $('min-clicks').value = '0';
+      $('source-label').textContent = input.demo ? '合成演示数据 · 非真实站点' : '本地数据 / ' + input.filename;
+      $('results').hidden = false;
+      message(input.demo ? '演示已载入。上传你的 CSV 即可替换，不会与示例混用。' : '已在本机完成分析，没有上传数据。');
+      $('coverage').textContent = `最近窗口 ${model.currentStart} 至 ${model.end}；前期 ${model.previousStart} 至 ${model.previousEnd}。` + (coverage ? `采集清单已验证。${coverage.capped.length ? coverage.capped.length + ' 天触及 API 行数上限，相关比较停用。' : ''}缺行按“已返回数据集中的 0”处理，不代表 Google 保证全量。` : '未提供采集清单：只有页面明确覆盖的日期参与完整比较，缺日不补 0。');
+      $('stats').replaceChildren();
+      const comparable = model.pages.filter(p => p.comparable), lost = comparable.filter(p => p.loss > 0).reduce((s, p) => s + p.loss, 0);
+      const stats = [[model.pages.length, '已导入页面', '只包含 CSV 中出现的 URL'], [comparable.length, '可比较页面', '两个完整的 28 天窗口'], [model.pages.filter(p => p.status === '优先排查').length, '优先排查', '前期 ≥30 点击且下降 ≥20%'], [lost, '下降页面减少的点击', '不抵扣增长页，不是全站净损失']];
+      for (const [value, title, note] of stats) { const card = element('div', undefined, 'stat'); card.append(element('span', title), element('strong', fmt(value)), element('small', note)); $('stats').append(card); }
+      renderTable();
+    } catch (error) { if (token === generation) message(error.message, true); }
+  }
+  async function importFiles() {
+    const token = ++generation, file = $('csv-file').files[0], manifest = $('manifest-file').files[0];
+    if (!file) { message('请先选择 CSV'); return; }
+    $('results').hidden = true; model = null; payload = null;
+    try {
+      if (file.size > 20 * 1024 * 1024 || (manifest && manifest.size > 1024 * 1024)) throw Error('文件过大：CSV 上限 20 MB，清单上限 1 MB');
+      const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(await file.arrayBuffer());
+      const input = { text, filename: file.name, manifest: manifest ? JSON.parse(await manifest.text()) : null };
+      if (token === generation) await load(input, token);
+    } catch (error) { if (token === generation) message('导入失败：' + error.message, true); }
+  }
+  function filtered() {
+    const query = $('search').value.toLowerCase(), min = Math.max(0, Number($('min-clicks').value) || 0);
+    const pages = model.pages.filter(p => p.page.toLowerCase().includes(query) && (min === 0 || (p.previous.complete && p.previous.clicks >= min)));
+    if ($('sort').value === 'total') pages.sort((a, b) => b.annual.clicks - a.annual.clicks);
+    return pages;
+  }
+  function renderTable() {
+    if (!model) return;
+    const metric = $('metric').value, pages = filtered(), maxPage = Math.max(0, Math.ceil(pages.length / 50) - 1);
+    pageIndex = Math.min(pageIndex, maxPage);
+    const head = element('tr');
+    for (const text of ['页面 / 排查信号', ...model.months.map(m => m.label), '12 月已观测合计', '前 28 天点击', '近 28 天点击', '减少点击', '变化']) head.append(element('th', text));
+    $('head').replaceChildren(head); $('body').replaceChildren();
+    for (const p of pages.slice(pageIndex * 50, pageIndex * 50 + 50)) {
+      const tr = element('tr'), cell = element('td'), button = element('button', p.page.replace(/^https?:\/\/[^/]+/, ''), 'page-button');
+      button.title = p.page; button.addEventListener('click', () => showDetail(p));
+      cell.append(button, element('span', p.status, 'signal')); tr.append(cell);
+      const full = p.monthly.filter(m => m.complete), average = full.length ? full.reduce((s, m) => s + m[metric], 0) / full.length : 0;
+      for (const m of p.monthly) {
+        const td = element('td', m.complete ? fmt(m[metric]) : m.observedDays ? fmt(m[metric]) + '*' : '—');
+        if (m.complete) { const ratio = average ? m[metric] / average : 0, light = 98 - Math.min(ratio, 2.5) * 21; td.style.backgroundColor = `hsl(151 28% ${light}%)`; td.style.color = light < 58 ? 'white' : '#254638'; td.title = `完整窗口；该页月均值 ${fmt(average)}，本月为 ${average ? ratio.toFixed(2) : '0'} 倍`; }
+        else { td.className = 'partial'; td.title = `部分或未知：已观测 ${m.observedDays} / ${m.days} 天；不用于热力色比较`; }
+        tr.append(td);
+      }
+      for (const v of [fmt(p.annual[metric]), p.comparable ? fmt(p.previous.clicks) : '—', p.comparable ? fmt(p.current.clicks) : '—', fmt(p.loss), pct(p.change)]) tr.append(element('td', v));
+      tr.lastChild.className = p.change < 0 ? 'loss' : 'gain'; $('body').append(tr);
+    }
+    if (!pages.length) { const cell = element('td', '没有符合条件的页面'); cell.colSpan = 18; const row = element('tr'); row.append(cell); $('body').append(row); }
+    $('count').textContent = `${pages.length} 个页面 · 第 ${pageIndex + 1} / ${maxPage + 1} 页 · 每页 50 条`;
+    $('prev').disabled = pageIndex === 0; $('next').disabled = pageIndex >= maxPage;
+  }
+  function chart(p, key, label) {
+    const card = element('div', undefined, 'chart'); card.append(element('h3', label));
+    const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 460 150'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', label + '按月趋势');
+    const values = p.monthly.map(m => m.complete ? m[key] : null), present = values.filter(v => v !== null), max = Math.max(...present, 1);
+    function shape(tag, attrs, text) { const node = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v); if (text !== undefined) node.textContent = text; svg.append(node); return node; }
+    shape('line', { x1: 35, x2: 448, y1: 118, y2: 118, stroke: '#dce5df' });
+    shape('text', { x: 0, y: 20, fill: '#6a7a70', 'font-size': 10 }, key === 'ctr' ? pct(max) : fmt(max));
+    let segment = [];
+    function draw() { if (segment.length) shape('polyline', { points: segment.join(' '), fill: 'none', stroke: '#28735a', 'stroke-width': 2 }); segment = []; }
+    values.forEach((v, i) => {
+      const x = 40 + i * 36.5;
+      if (v === null) { draw(); return; }
+      const y = 118 - v / max * 98; segment.push(`${x},${y}`);
+      const dot = shape('circle', { cx: x, cy: y, r: 3, fill: '#28735a' });
+      const title = document.createElementNS(ns, 'title'); title.textContent = model.months[i].label + ': ' + (key === 'ctr' ? pct(v) : fmt(v)); dot.append(title);
+    }); draw();
+    shape('text', { x: 35, y: 143, fill: '#6a7a70', 'font-size': 10 }, model.months[0].label);
+    shape('text', { x: 402, y: 143, fill: '#6a7a70', 'font-size': 10 }, model.months[11].label);
+    card.append(svg, element('p', key === 'position' ? '排名数字越小越好；缺数据处断开。' : '只绘制完整月份；悬停圆点查看数值。'));
+    return card;
+  }
+  function showDetail(p) {
+    $('detail').hidden = false; $('detail-title').textContent = p.page;
+    $('detail-compare').textContent = p.comparable ? `前 28 天 ${fmt(p.previous.clicks)} 点击 → 近 28 天 ${fmt(p.current.clicks)} 点击 · 变化 ${pct(p.change)} · ${p.status}` : '两个 28 天窗口尚未完整，不计算下滑幅度。';
+    $('charts').replaceChildren(...[['clicks', '点击'], ['impressions', '展示'], ['ctr', 'CTR'], ['position', '平均排名']].map(([key, title]) => chart(p, key, title)));
+    $('advice').replaceChildren(...D.guidance(p).map(text => element('li', text)));
+    $('detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  $('csv-file').addEventListener('change', importFiles); $('manifest-file').addEventListener('change', importFiles);
+  $('demo').addEventListener('click', () => { $('csv-file').value = ''; $('manifest-file').value = ''; load({ text: demoData(), filename: 'synthetic-demo.csv', manifest: null, demo: true }); });
+  $('sample').addEventListener('click', () => download('synthetic-demo.csv', demoData(), 'text/csv;charset=utf-8'));
+  for (const id of ['search', 'min-clicks', 'metric', 'sort']) $(id).addEventListener('input', () => { pageIndex = 0; renderTable(); });
+  $('prev').addEventListener('click', () => { pageIndex--; renderTable(); }); $('next').addEventListener('click', () => { pageIndex++; renderTable(); });
+  $('close-detail').addEventListener('click', () => { $('detail').hidden = true; });
+  $('export-csv').addEventListener('click', () => { if (model) download('content-decay-analysis.csv', D.exportCSV(model), 'text/csv;charset=utf-8'); });
+  $('export-html').addEventListener('click', () => {
+    if (!payload) return;
+    const clone = document.documentElement.cloneNode(true);
+    clone.querySelector('#seed').textContent = JSON.stringify(payload).replace(/</g, '\\u003c');
+    for (const id of ['body', 'head', 'stats', 'charts', 'advice']) clone.querySelector('#' + id).replaceChildren();
+    clone.querySelector('#results').hidden = true; clone.querySelector('#detail').hidden = true;
+    download('content-decay-private-report.html', '<!doctype html>\n' + clone.outerHTML, 'text/html;charset=utf-8');
+    message('已保存含本次数据的离线报告。分享前请确认其中没有私有站点信息。');
+  });
+  $('clear').addEventListener('click', () => { generation++; model = null; payload = null; $('seed').textContent = 'null'; $('csv-file').value = ''; $('manifest-file').value = ''; $('results').hidden = true; for (const id of ['body', 'head', 'stats', 'charts', 'advice']) $(id).replaceChildren(); message('本次数据已清除。已下载到磁盘的报告不会被删除。'); });
+  let seed = JSON.parse($('seed').textContent); if (seed) load(seed); seed = null;
+})();
+</script>
+</body></html>

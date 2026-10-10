@@ -1,12 +1,16 @@
 ---
 name: seo-gsc-ga4-analyst
 description: >-
-  Build and run local SEO data analysis workflows using Google Search Console API and GA4 Data API. Use when the user wants to scaffold a Python project, fetch GSC search performance, fetch GA4 Organic Search landing page data, merge both sources, diagnose SEO opportunities, create weekly SEO reports, create advanced GSC diagnosis with charts, or troubleshoot GSC/GA4 API access while keeping service account secrets in local .env files.
+  Build and run local SEO data analysis workflows using Google Search Console API and GA4 Data API. Use when the user wants GSC content decay analysis, a 12-month page heatmap, declining-page prioritization, a private offline HTML report, GSC CSV analysis, a Python SEO project, GSC/GA4 data fetching, weekly SEO reports, or API troubleshooting while keeping credentials local.
 ---
 
 # SEO GSC GA4 Analyst
 
 Use this skill to turn GSC and GA4 into a local SEO analyst workflow. Keep secrets local, pull raw CSVs, produce opportunity tables, and write Chinese-first diagnostic reports unless the user asks otherwise.
+
+## Content Decay / 内容衰退模式
+
+For monthly heatmaps, traffic decay, declining pages, or standalone GSC CSV analysis, read [references/content_decay.md](references/content_decay.md) and use that route. It requires **GSC only**, not GA4. Reuse an existing page-daily CSV when appropriate; never use query-detail sums as page totals. The shared browser engine powers both private offline reports and the free public CSV tool. Do not upload private data or generated reports to GitHub/Red Skill. Only the data-free public bundle belongs in `docs/`.
 
 ## Workflow
 

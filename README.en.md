@@ -10,6 +10,12 @@ It helps Codex scaffold a Python project, fetch GSC and GA4 Organic Search data,
 
 ## What It Does
 
+### Content Decay Radar (GSC-only)
+
+[Free browser tool](https://owensky-dev.github.io/seo-gsc-ga4-analyst/). Import a UTF-8 CSV with `date,page,clicks,impressions` and optional `ctr,position`; ordinary GSC page-total exports are not sufficient. The tool provides twelve complete calendar months of per-page heatmaps, equal 28-day click comparisons, four metric trends, investigation checklists, CSV export, and a self-contained private HTML report. Data stays in the browser; no login, telemetry, external CDN, or upload endpoint. Limits: 20 MB / 200,000 rows.
+
+The Skill uses the same engine. After scaffolding, run `scripts/fetch_content_decay.py` (only GSC settings required), then `python3 scripts/content_decay_report.py --csv data/raw/gsc_content_decay.csv --manifest data/raw/gsc_content_decay.manifest.json --out reports/content-decay.html`. Inspect the report in a browser to verify analysis. API requests are paginated daily and tracked with a hash-bound manifest; completed requests are not a promise of exhaustive GSC rows. Missing dates remain unknown without coverage evidence, and capped days disable complete comparisons. Never publish private reports to `docs/`.
+
 - Fetches separate 90-day GSC property-daily, page-daily, and query-detail tables so anonymized queries do not understate KPIs.
 - Fetches 90-day GA4 Organic Search landing page data.
 - Uses one shared 90-day GSC/GA4 window ending three days ago and validates request contracts, file hashes, and returned dates with sidecar manifests.

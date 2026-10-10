@@ -18,6 +18,41 @@
 - 自动识别高展示低 CTR、排名 8–20 名、近期点击下滑、自然流量高但转化弱、关键词与页面不匹配及内容缺口。
 - 输出 Markdown、CSV 周报与机会清单，并提供 P0 / P1 / P2 优先级行动建议。
 
+## 内容衰退雷达
+
+[打开免费网页版](https://owensky-dev.github.io/seo-gsc-ga4-analyst/) · [完整数据口径](references/content_decay.md)
+
+新增独立 GSC 模式，不需要 GA4：
+
+- 12 个完整月的页面热力图，切换点击 / 展示；按每个页面自己的月均值着色。
+- 最近 28 天 vs 前 28 天，按减少点击数排优先级，同时显示降幅和前期规模。
+- 单页点击、展示、CTR、平均排名趋势，以及下一步排查清单。
+- 导出分析 CSV、可离线打开的单文件 HTML。没有完整数据的月份显示未知，不直接补零。
+
+免费网页不需要登录，不上传 CSV，无第三方统计脚本。可先点“先看演示”；演示全部是 `example.com` 合成数据。当前支持 20 MB / 20 万行以内的日期 × 页面 CSV，**GSC 普通页面汇总表不能直接还原月度趋势**。
+
+Skill 用户在创建好的项目中执行（`.env` 只需 GSC 资源和本地服务账号凭据路径）：
+
+```bash
+.venv/bin/python scripts/fetch_content_decay.py
+python3 scripts/content_decay_report.py \
+  --csv data/raw/gsc_content_decay.csv \
+  --manifest data/raw/gsc_content_decay.manifest.json \
+  --out reports/content-decay.html
+```
+
+默认按天读取最近 12 个完整月和当前已可用的日期，终点为 PT 今天减 3 天。采集清单记录逐日请求及文件校验，GSC API 可能遗漏部分行，触及每日上限的日期会标记不完整。已有 `gsc_page_daily_90d.csv` 可直接传入 `--csv`（不传新清单），其余月份保留未知。
+
+网页版和 Skill 使用同一个 `assets/project-template/decay/engine.js`，没有两套计算口径。维护者生成无数据公开版：
+
+```bash
+python3 assets/project-template/scripts/content_decay_report.py --out docs/index.html
+node --test tests/test_content_decay.cjs
+python3 -m unittest discover -s tests -p 'test_*.py'
+```
+
+`docs/index.html` 仅能放无数据工具；不要把客户 CSV 或带数据 HTML 报告提交到仓库。公开页面通过 GitHub Pages 免费托管，平台会收到普通网页访问请求，但工具不会发送导入的分析数据。
+
 ## 适合谁
 
 - 独立站老板：把“SEO 做得怎么样”变成清楚的经营判断。
