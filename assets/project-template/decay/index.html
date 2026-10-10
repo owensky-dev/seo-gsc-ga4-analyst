@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="免费 GSC 内容衰退分析：本地导入 CSV，查看 12 个月页面热力图、28 天点击下滑和排查清单。数据不上传。">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'">
+<title>内容衰退雷达 · GSC 免费分析工具</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><a class="brand" href="https://github.com/owensky-dev/seo-gsc-ga4-analyst" target="_blank" rel="noopener">虎皮叔叔 <span>/ SEO LAB</span></a><span class="badge">免费 · 无需登录 · 数据留在本机</span></header>
+<main>
+<section class="hero"><p class="eyebrow">GSC CONTENT DECAY RADAR</p><h1>哪些页面，<br>正在悄悄掉流量？</h1><p class="lead">把一年的搜索表现摊开看。找到值得优先处理的页面，再决定要不要重写。</p></section>
+<section class="import-card" aria-label="导入数据">
+<div><h2>从你的 GSC 数据开始</h2><p>导入「日期 × 页面」CSV。文件只在浏览器内读取，不会上传。</p></div>
+<div class="actions"><label class="button primary">选择 CSV<input id="csv-file" type="file" accept=".csv,text/csv"></label><button id="demo">先看演示</button><button id="sample">下载示例 CSV</button></div>
+<details><summary>需要什么数据？如何导出？</summary><p>必需列：<code>date,page,clicks,impressions</code>；可选：<code>ctr,position</code>。每行代表一天、一个页面。日期用 YYYY-MM-DD。最多 20 MB / 20 万行。</p><p>GSC 网页里的“页面”汇总和“日期”汇总是两张不同的表，不能拼出这张热力图。使用本开源 Skill 的 <code>fetch_content_decay.py</code>，从官方 API 按天取数；只需 GSC 只读访问，不需要 GA4。也可导入已有的同口径 CSV。</p><p>想用 Skill 自动生成报告？<a href="https://github.com/owensky-dev/seo-gsc-ga4-analyst#内容衰退雷达" target="_blank" rel="noopener">查看安装与取数步骤 ↗</a></p><label class="manifest-label">可选：同时导入本工具的 .manifest.json 采集清单 <input id="manifest-file" type="file" accept=".json,application/json"></label><p>清单验证文件和逐日采集窗口。没有清单时，未出现的日期保持未知；页面明确覆盖两个完整窗口时仍可比较。API 返回行也可能不是全量，触及上限的日期会标记不完整。</p></details>
+<p id="message" role="status" aria-live="polite">尚未导入数据。可以先用合成示例试一试。</p>
+</section>
+<section id="results" hidden>
+<div class="section-head"><div><p class="eyebrow" id="source-label"></p><h2>先看变化，再排优先级</h2></div><div class="actions"><button id="export-csv">导出分析 CSV</button><button id="export-html">保存离线报告</button><button id="clear">清除本次数据</button></div></div>
+<div id="stats" class="stats"></div>
+<p id="coverage" class="note"></p>
+<section class="panel"><div class="section-head"><div><h2>页面月度热力图</h2><p id="heat-caption">每行与这个页面自己的月均值比较，颜色不跨页面比较。</p></div><div class="actions"><label>指标 <select id="metric"><option value="clicks">点击</option><option value="impressions">展示</option></select></label><label>排序 <select id="sort"><option value="loss">28 天减少点击</option><option value="total">12 月点击总量</option></select></label></div></div>
+<div class="filters"><label>筛选页面 <input id="search" type="search" placeholder="输入 URL 中的关键词"></label><label>前 28 天点击 ≥ <input id="min-clicks" type="number" min="0" value="0" step="1"></label><span class="legend">浅 → 深：低于 → 高于自身月均值<br>— 未知　* 部分数据</span></div>
+<div class="table-scroll"><table><caption class="sr-only">页面热力图和两个 28 天窗口比较，点击页面查看详情</caption><thead id="head"></thead><tbody id="body"></tbody></table></div><div class="pagination"><span id="count"></span><button id="prev">上一页</button><button id="next">下一页</button></div></section>
+<section id="detail" class="panel" hidden><div class="section-head"><div><p class="eyebrow">PAGE INSIGHT</p><h2 id="detail-title"></h2></div><button id="close-detail">收起详情</button></div><p id="detail-compare"></p><div id="charts" class="charts"></div><h3>下一步怎么查</h3><ul id="advice"></ul><p class="note">本页未导入查询明细，不推测关键词原因；在 GSC 里筛选同一 URL 后继续按查询、设备检查。平均排名按展示量加权，CTR 按总点击 ÷ 总展示重算。</p></section>
+</section>
+<footer><p>虎皮叔叔聊跨境独立站 · 用数据找到下一步</p><p><a href="https://github.com/owensky-dev/seo-gsc-ga4-analyst" target="_blank" rel="noopener">源码与 Skill</a> · <a href="https://developers.google.com/webmaster-tools/v1/how-tos/all-your-data" target="_blank" rel="noopener">Google 数据口径</a> · 本工具没有上传接口、广告或统计追踪。导出的报告含你导入的数据，请自行保管。</p></footer>
+</main>
+<script type="application/json" id="seed">null</script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body></html>

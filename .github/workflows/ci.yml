@@ -5,6 +5,8 @@ on:
     paths:
       - ".github/workflows/ci.yml"
       - "assets/project-template/scripts/**"
+      - "assets/project-template/decay/**"
+      - "docs/**"
       - "scripts/**"
       - "tests/**"
   push:
@@ -13,6 +15,8 @@ on:
     paths:
       - ".github/workflows/ci.yml"
       - "assets/project-template/scripts/**"
+      - "assets/project-template/decay/**"
+      - "docs/**"
       - "scripts/**"
       - "tests/**"
   workflow_dispatch:
@@ -49,3 +53,11 @@ jobs:
 
       - name: Run unit tests
         run: python -m unittest discover -s tests -p 'test_*.py'
+
+      - name: Test shared browser analysis engine
+        run: node --test tests/test_content_decay.cjs
+
+      - name: Check public bundle matches source
+        run: |
+          python assets/project-template/scripts/content_decay_report.py --out /tmp/content-decay-index.html
+          cmp docs/index.html /tmp/content-decay-index.html
