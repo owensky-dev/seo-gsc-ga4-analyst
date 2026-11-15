@@ -1,6 +1,8 @@
 # SEO GSC GA4 Analyst
 
+<!-- hupishushu:links:start -->
 [Website](https://hupishushu.com/) · [Project overview (中文)](https://hupishushu.com/projects/seo-gsc-ga4-analyst/) · [Usage guide (中文)](https://hupishushu.com/skills/seo-gsc-ga4-analyst/)
+<!-- hupishushu:links:end -->
 
 [![CI](https://github.com/owensky-dev/seo-gsc-ga4-analyst/actions/workflows/ci.yml/badge.svg)](https://github.com/owensky-dev/seo-gsc-ga4-analyst/actions/workflows/ci.yml)
 
