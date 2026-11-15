@@ -1,5 +1,7 @@
 # SEO GSC GA4 Analyst
 
+[虎皮叔叔 · hupishushu.com](https://hupishushu.com/) · [项目介绍](https://hupishushu.com/projects/seo-gsc-ga4-analyst/) · [中文使用指南](https://hupishushu.com/skills/seo-gsc-ga4-analyst/)
+
 新增功能：[内容衰退雷达 / 免费网页版与 Skill 使用方法](README.md#内容衰退雷达)。支持 12 个月页面热力图、28 天点击下滑排序、单页趋势和离线报告，无需 GA4，CSV 不上传。完整中文说明以 [README.md](README.md) 为准。
 
 [![CI](https://github.com/owensky-dev/seo-gsc-ga4-analyst/actions/workflows/ci.yml/badge.svg)](https://github.com/owensky-dev/seo-gsc-ga4-analyst/actions/workflows/ci.yml)
