@@ -1,6 +1,8 @@
 # SEO GSC GA4 Analyst
 
-[虎皮叔叔 · hupishushu.com](https://hupishushu.com/) · [项目介绍](https://hupishushu.com/projects/seo-gsc-ga4-analyst/) · [中文使用指南](https://hupishushu.com/skills/seo-gsc-ga4-analyst/)
+<!-- hupishushu:links:start -->
+[虎皮叔叔 · hupishushu.com](https://hupishushu.com/) · [项目介绍](https://hupishushu.com/projects/seo-gsc-ga4-analyst/) · [使用指南](https://hupishushu.com/skills/seo-gsc-ga4-analyst/)
+<!-- hupishushu:links:end -->
 
 [![CI](https://github.com/owensky-dev/seo-gsc-ga4-analyst/actions/workflows/ci.yml/badge.svg)](https://github.com/owensky-dev/seo-gsc-ga4-analyst/actions/workflows/ci.yml)
 
