@@ -1,5 +1,7 @@
 # SEO GSC GA4 Analyst
 
+[Website](https://hupishushu.com/) · [Project overview (中文)](https://hupishushu.com/projects/seo-gsc-ga4-analyst/) · [Usage guide (中文)](https://hupishushu.com/skills/seo-gsc-ga4-analyst/)
+
 [![CI](https://github.com/owensky-dev/seo-gsc-ga4-analyst/actions/workflows/ci.yml/badge.svg)](https://github.com/owensky-dev/seo-gsc-ga4-analyst/actions/workflows/ci.yml)
 
 Codex skill for building a local SEO data analysis workflow with Google Search Console API and GA4 Data API.
